@@ -12,8 +12,8 @@ private val processors = Runtime.getRuntime().availableProcessors()
 @OptIn(DelicateCoroutinesApi::class)
 val globalContext = CoroutineScope(
     SupervisorJob()
-            + newFixedThreadPoolContext(processors * 32, "wk")
-            + Dispatchers.IO.limitedParallelism(processors, "io")
+            + newFixedThreadPoolContext(processors * 4, "wk")
+            + Dispatchers.IO.limitedParallelism(processors * 2, "io")
 )
 
 fun runMain(
