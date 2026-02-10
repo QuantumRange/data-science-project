@@ -24,6 +24,7 @@ dependencies {
     // kotlin basics
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 
     // html
     implementation("io.ktor:ktor-client-core:3.3.3")
@@ -33,6 +34,7 @@ dependencies {
     // xml
     implementation("io.github.pdvrieze.xmlutil:core-jdk:0.91.3")
     implementation("io.github.pdvrieze.xmlutil:serialization-jvm:0.91.3")
+    implementation("com.prof18.rssparser:rssparser:6.1.1")
 
     // misc
     implementation("ch.qos.logback:logback-classic:1.5.28")
