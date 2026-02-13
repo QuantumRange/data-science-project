@@ -1,10 +1,14 @@
 package dev.qr.scripts
 
+import com.codahale.metrics.Meter
+import com.codahale.metrics.Metric
 import dev.qr.model.BodyKind
 import dev.qr.model.ProtocolVersion
 import dev.qr.parquet.ParquetSchema
 import dev.qr.parquet.ParquetService
+import dev.qr.util.RocksUtil
 import dev.qr.util.UrlUtil
+import dev.qr.util.globalContext
 import dev.qr.util.runMain
 import io.ktor.http.HttpProtocolVersion
 import io.ktor.http.Url
@@ -12,6 +16,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.sync.Mutex
@@ -23,13 +29,21 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
+import okhttp3.internal.format
 import org.apache.avro.generic.GenericRecord
 import org.apache.avro.util.Utf8
+import org.apache.hadoop.fs.Options.HandleOpt.path
 import util.LinkUtil
 import java.io.File
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.fetchAndIncrement
+import kotlin.io.path.Path
+import kotlin.system.exitProcess
 
 private val folderLock = Mutex()
-private val parallel = Semaphore(2)
+private val parallel = Semaphore(1)
 private val folderMetadataFile = File("/mnt/Fast2T/data/crawls_v3/meta.json")
 
 @Serializable
@@ -43,12 +57,24 @@ data class FolderMetadata(
     )
 }
 
+private val crawlMetric = Meter()
+private val fileMetric = Meter()
+
+@OptIn(ExperimentalAtomicApi::class)
 fun main(): Unit = runMain {
+    println("Preparing db...")
+    RocksUtil.open(Path("db/"))
+    println("Loaded!")
+
     val sourceDir = File("/mnt/Fast2T/data/crawls_v2/")
     val targetDir = File("/mnt/Fast2T/data/crawls_v3/")
 
+    var files = AtomicInt((targetDir.listFiles()!!.size - 1) / 2)
+    val totalFiles = sourceDir.listFiles()!!.size / 2
+
     sourceDir.listFiles()!!
         .filter { it.extension == "parquet" }
+        .sortedBy { it.name }
         .map { sourceFile ->
             async {
                 val metaFile = File(sourceDir, "${sourceFile.name}.meta.json")
@@ -65,13 +91,34 @@ fun main(): Unit = runMain {
 
                 parallel.withPermit {
                     val flow = ParquetService.read(sourceFile, ParquetSchema.CRAWL_V2)
-                        .processRecords()
+                        .filter { it.get("version") != null }
                         .onEach { ids.add(it.get("url") as Long) }
 
-                    ParquetService.write(targetFile, ParquetSchema.CRAWL_V3, flow)
+                    ParquetService.write(
+                        targetFile,
+                        ParquetSchema.CRAWL_V3,
+                        flow,
+                        block = GenericRecord::processRecords
+                    )
                     ParquetService.write(idFile, ParquetSchema.CRAWL_ID, ids.asFlow()) { id -> put("id", id) }
-                    println("Processed ${sourceFile.name}...")
+                    files.fetchAndIncrement()
                 }
+                fileMetric.mark()
+                crawlMetric.mark(ids.size.toLong())
+
+                val perSecond = fileMetric.fiveMinuteRate
+                val left = totalFiles - files.load()
+                val time = left / perSecond
+
+                println(
+                    "Processed ${sourceFile.name} :: ${
+                        format("%.2f", crawlMetric.fiveMinuteRate)
+                    }url/s ${
+                        format("%.2f", fileMetric.fiveMinuteRate * 60.0)
+                    }file/m (${
+                        format("%.2f", time * 60.0)
+                    }m left)"
+                )
 
                 require(min == ids.minOrNull()) { "Min id mismatch $min vs ${ids.minOrNull()}" }
                 require(max == ids.maxOrNull()) { "Max id mismatch $min vs ${ids.maxOrNull()}" }
@@ -82,7 +129,6 @@ fun main(): Unit = runMain {
                     } else Json.decodeFromString(folderMetadataFile.readText())
 
                     data = data.copy(files = data.files + (sourceFile.name to FolderMetadata.Meta(min, max)))
-
                     folderMetadataFile.writeText(Json.encodeToString(data))
                 }
             }
@@ -90,42 +136,33 @@ fun main(): Unit = runMain {
         .awaitAll()
 }
 
-private val domainLookup = HashMap<String, Long>(
-    File("data/domain.csv")
-        .readLines()
-        .drop(1)
-        .associate {
-            val id = it.substringBefore(",").toLong()
-            val domain = it.substringAfter(",")
+private val domainLookup by lazy {
+    HashMap<String, Long>(
+        File("data/domain.csv")
+            .readLines()
+            .drop(1)
+            .associate {
+                val id = it.substringBefore(",").toLong()
+                val domain = it.substringAfter(",")
 
-            domain to id
-        }
-)
+                domain to id
+            }
+    )
+}
 
-private val urlLoopup = HashMap<String, Long>(
-    File("data/urls.csv")
-        .readLines()
-        .drop(1)
-        .associate {
-            val id = it.substringBefore(",").toLong()
-            val domain = it.substringAfter(",")
+private fun getIdForDomain(domain: String): Long? = domainLookup[domain]
 
-            domain to id
-        }
-)
-
-private suspend fun getIdForDomain(domain: String): Long = domainLookup[domain]!!
-private suspend fun getUrlForId(id: Long): String = TODO()
-private suspend fun getIdForUrl(url: String): Long? = TODO()
-
+@Serializable
 private data class Links(
     val domains: Map<Long, Int>,
     val links: List<Long>
 )
 
-private suspend fun Flow<GenericRecord>.processRecords(): Flow<GenericRecord> = this.map { record ->
+//GenericRecord.(data: T) -> Unit
+
+private suspend fun GenericRecord.processRecords(record: GenericRecord) {
     val id = record.get("url") as Long
-    val urlStr = getUrlForId(id)
+    val urlStr = RocksUtil.getUrl(id)!!
     val duration = (record.get("duration") as? Long?) ?: 0
     val typeIndex = (record.get("content_type") as? Int?) ?: BodyKind.UNKNOWN.ordinal
 
@@ -138,37 +175,41 @@ private suspend fun Flow<GenericRecord>.processRecords(): Flow<GenericRecord> = 
             ?: error("Unknown version $version")
     } ?: ProtocolVersion.UNKNOWN.ordinal
 
-    val urls = LinkUtil.extractLinks(
-        Url(urlStr),
-        BodyKind.entries[typeIndex],
-        (record.get("content") as Utf8).toString(),
-    ).mapNotNull { UrlUtil.processUrl(it) }
+    val content = (record.get("content") as? Utf8?)?.toString()
+//    val urls = content?.let {
+//        LinkUtil.extractLinks(
+//            Url(urlStr),
+//            BodyKind.entries[typeIndex],
+//            content,
+//        ).mapNotNull { UrlUtil.processUrl(it) }
+//    } ?: emptyList()
 
-    val domains = mutableMapOf<Long, Int>()
-    val links = mutableListOf<Long>()
+//    val domains = mutableMapOf<Long, Int>()
+//    val links = mutableListOf<Long>()
 
-    urls.forEach { url ->
-        getIdForUrl(url.toString())
-            ?.let { links.add(it) }
-            ?: run {
-                val domainId = getIdForDomain(url.host)
+//    RocksUtil.getIds(urls.map { it.toString() }).forEach { links.add(it) }
 
-                domains.compute(domainId) { _, count -> count?.plus(1) ?: 1 }
-            }
-    }
+//    urls
+//        .groupBy { it.host }
+//        .forEach { (_, urls) ->
+//            val domainId = getIdForDomain(urls.first().host)
+//            require(domainId != null) { "Unknown host ${urls.first().host}" }
+//            domains[domainId] = urls.size
+//        }
 
     // set new fields
-    record.put("id", id)
-    record.put("url", urlStr)
-    record.put("duration", duration)
-    record.put("http_version", httpIndex)
-    record.put("type", typeIndex)
-    record.put("links", Json.encodeToString(Links(domains, links)))
+    put("id", id)
+    put("domain", getIdForDomain(Url(urlStr).host)!!)
+    put("url", urlStr)
 
-    // erase fields
-    record.put("version", null)
-    record.put("content_type", null)
+    put("timestamp", record.get("timestamp"))
+    put("duration", duration)
+    put("http_version", httpIndex)
+    put("status", record.get("status"))
+    put("header", record.get("header"))
 
-    record
+    put("type", typeIndex)
+    put("content", content)
+//    put("links", Json.encodeToString(Links(domains, links)))
 }
 

@@ -51,34 +51,32 @@ private suspend fun migrate(
         target,
         ParquetSchema.CRAWL_V2,
         ParquetService.read(source, ParquetSchema.CRAWL_V1)
-            .map {
-                val rawContent = it.get("content") as? ByteBuffer? ?: return@map it
+    ) {
+        put("url", it.get("url"))
+        put("timestamp", it.get("timestamp"))
+        put("duration", it.get("duration"))
+        put("version", it.get("version"))
+        put("status", it.get("status"))
+        put("header", it.get("header"))
+        put("content", it.get("content"))
+        put("content_type", it.get("content_type"))
 
-                val raw = GZIPInputStream(ByteArrayInputStream(rawContent.moveToByteArray())).use { gzip ->
-                    gzip.readAllBytes()
-                }.decodeToString()
+        val rawContent = it.get("content") as? ByteBuffer? ?: return@write
 
-                it.put("content", raw)
+        val raw = GZIPInputStream(ByteArrayInputStream(rawContent.moveToByteArray())).use { gzip ->
+            gzip.readAllBytes()
+        }.decodeToString()
 
-                it
-            }
-            .map {
-//                println(it.get("header")::class)
-//                println((it.get("header") as? java.util.HashMap<*, *>?)?.keys?.first()?.let { v -> v::class })
-//                println((it.get("header") as? java.util.HashMap<*, *>?)?.values?.first()?.let { v -> v::class })
-//                println((it.get("header") as? java.util.HashMap<*, *>?)?.values?.first()?.let { v -> (v as ArrayList<String>).first()::class })
+        put("content", raw)
 
-                @Suppress("UNCHECKED_CAST")
-                val map = it.get("header") as? java.util.HashMap<Utf8, List<Utf8>>? ?: emptyMap()
+        @Suppress("UNCHECKED_CAST")
+        val map = it.get("header") as? java.util.HashMap<Utf8, List<Utf8>>? ?: emptyMap()
 
-                it.put("header", JsonObject(map.map { (key, value) ->
-                    key.toString() to JsonArray(value.map { v -> JsonPrimitive(v.toString()) })
-                }.toMap()))
+        put("header", JsonObject(map.map { (key, value) ->
+            key.toString() to JsonArray(value.map { v -> JsonPrimitive(v.toString()) })
+        }.toMap()))
 
-                it
-            }
-            .flowOn(Dispatchers.IO)
-    )
+    }
 
     val file = File(source.parentFile, "${source.name}.meta.json")
 

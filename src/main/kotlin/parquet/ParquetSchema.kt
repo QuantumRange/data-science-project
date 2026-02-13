@@ -105,17 +105,17 @@ object ParquetSchema {
       "namespace": "example",
       "fields": [
         { "name": "id", "type": "long" },
+        { "name": "domain", "type": "long" },
         { "name": "url", "type": "string" },
         
         { "name": "timestamp", "type": "long" },
         { "name": "duration", "type": "long" },
         { "name": "http_version", "type": "int" },
-        { "name": "status",  "type": ["null", "int"],    "default": null },
+        { "name": "status",  "type": ["null", "int"], "default": null },
         { "name": "header", "type": ["null", "string"], "default": null },
         
-        { "name": "type", "type": "int", "default": null },
-        { "name": "content", "type": ["null", "string"], "default": null },
-        { "name": "links", "type": "string", "default": null }
+        { "name": "type", "type": "int" },
+        { "name": "content", "type": ["null", "string"], "default": null }
       ]
     }
     """

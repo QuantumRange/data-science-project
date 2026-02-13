@@ -136,9 +136,7 @@ object LinkUtil {
             if (scheme != "http" && scheme != "https") return null
             if (absoluteUrl.host.isNullOrBlank()) return null
 
-            val absoluteUrlStr = absoluteUrl.toASCIIString()
-
-            return UrlUtil.processUrl(absoluteUrlStr)?.toString()
+            return absoluteUrl.toASCIIString()
         }
 
         doc.getElementsByAttribute("href")

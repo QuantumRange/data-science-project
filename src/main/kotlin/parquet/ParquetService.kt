@@ -1,7 +1,13 @@
 package dev.qr.parquet
 
+import dev.qr.util.globalContext
+import dev.qr.util.parallelMap
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericData
@@ -19,13 +25,13 @@ import java.io.File
 
 object ParquetService {
 
-    suspend fun write(
+    private suspend fun write(
         file: File,
         @Language("JSON") schema: String,
         data: Flow<GenericRecord>,
         codec: CompressionCodecName = CompressionCodecName.ZSTD
     ) {
-        val schema = Schema.Parser().parse(schema)
+        val schema = Schema.Parser().parse(schema)!!
         val conf = Configuration()
 
         AvroParquetWriter.builder<GenericRecord>(LocalOutputFile(file.toPath()))
@@ -43,14 +49,14 @@ object ParquetService {
         @Language("JSON") schema: String,
         data: Flow<T>,
         codec: CompressionCodecName = CompressionCodecName.ZSTD,
-        block: GenericRecord.(data: T) -> Unit
-    ) {
+        block: suspend GenericRecord.(data: T) -> Unit
+    ) = coroutineScope {
         val parsedSchema = Schema.Parser().parse(schema)
 
         write(
             file,
             schema,
-            data.map { GenericData.Record(parsedSchema).apply { block(it) } },
+            data.parallelMap { GenericData.Record(parsedSchema).apply { block(it) } },
             codec
         )
     }
