@@ -39,6 +39,9 @@ dependencies {
     // misc
     implementation("ch.qos.logback:logback-classic:1.5.28")
     implementation("io.dropwizard.metrics:metrics-core:4.2.28")
+    implementation("org.rocksdb:rocksdbjni:10.4.2:linux64")
+    implementation("com.github.luben:zstd-jni:1.5.7-6")
+    implementation("com.gliwka.hyperscan:hyperscan:5.4.11-3.1.0")
 
     testImplementation(kotlin("test"))
 }

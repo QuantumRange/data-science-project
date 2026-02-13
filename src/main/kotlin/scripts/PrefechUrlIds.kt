@@ -3,6 +3,7 @@ package dev.qr.scripts
 import com.fleeksoft.io.ByteArrayInputStream
 import dev.qr.parquet.ParquetSchema
 import dev.qr.parquet.ParquetService
+import dev.qr.util.RocksUtil
 import dev.qr.util.runMain
 import io.ktor.util.moveToByteArray
 import kotlinx.coroutines.Dispatchers
@@ -21,24 +22,21 @@ import java.lang.String.format
 import java.nio.ByteBuffer
 import java.util.HashMap
 import java.util.zip.GZIPInputStream
+import kotlin.io.path.Path
+import kotlin.system.exitProcess
 
 fun main(): Unit = runMain {
-    val sourceDir = File("/mnt/Fast2T/data/crawls_v2/")
-    val targetFile = File("/mnt/Fast2T/data/ids.csv")
+    println("Preparing db...")
 
-    println(File("data/urls.csv").readLines().size)
+    println("Nop, you wanted to change this code first! It shoulnd delete but append new data from the last largest id, etc.")
+    exitProcess(1)
 
-//    sourceDir.listFiles()!!
-//        .filter { it.extension == "parquet" }
-//        .map { file ->
-//            async {
-//                val compressFile = File(compressDir, file.name)
-//                val metaFile = File(metaDir, file.name)
-//
-//                if (!compressFile.exists()) {
-//                    migrate(file, compressFile)
-//                }
-//            }
-//        }
-//        .awaitAll()
+    val path = Path("db/")
+    path.toFile().deleteRecursively()
+    RocksUtil.open(path)
+
+    println("Loading...")
+    RocksUtil.loadFromPostgresBinaryCopy(Path("data/urls.copy.zst"), batchRows = 1_000_000)
+
+    println("Loaded!")
 }
