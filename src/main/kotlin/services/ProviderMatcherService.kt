@@ -1,13 +1,15 @@
-package dev.qr.util
+package dev.qr.services
 
 import com.gliwka.hyperscan.wrapper.Database
 import com.gliwka.hyperscan.wrapper.Expression
 import com.gliwka.hyperscan.wrapper.ExpressionFlag
 import com.gliwka.hyperscan.wrapper.Scanner
+import dev.qr.util.BalancerMutex
+import dev.qr.util.BalancerSupplier
 import kotlinx.coroutines.coroutineScope
 import java.util.EnumSet
 
-object ProviderMatcher {
+object ProviderMatcherService {
 
     private enum class Kind { Pattern, Exception }
     private data class Meta(val idx: Int, val kind: Kind)
@@ -15,12 +17,12 @@ object ProviderMatcher {
     private val metaByExprId = ArrayList<Meta>()
 
     private val db: Database
-    private val scanner: BalancerMutex<String, List<UrlUtil.Pattern>>
+    private val scanner: BalancerMutex<String, List<UrlService.Pattern>>
 
-    private val specialPattern = UrlUtil.patterns.single { it.urlPattern == ".*" }
+    private val specialPattern = UrlService.patterns.single { it.urlPattern == ".*" }
 
     init {
-        val rules = UrlUtil.patterns
+        val rules = UrlService.patterns
         val flags = EnumSet.of(ExpressionFlag.SINGLEMATCH, ExpressionFlag.UTF8)
 
         val expressions = ArrayList<Expression>()
@@ -52,12 +54,12 @@ object ProviderMatcher {
         }
 
         db = Database.compile(expressions)
-        scanner = BalancerMutex(50, object : BalancerSupplier<String, List<UrlUtil.Pattern>> {
+        scanner = BalancerMutex(50, object : BalancerSupplier<String, List<UrlService.Pattern>> {
             private val scanners = Array(50) {
                 Scanner().also { it.allocScratch(db) }
             }
 
-            override suspend fun supply(input: String, thread: Int): List<UrlUtil.Pattern> {
+            override suspend fun supply(input: String, thread: Int): List<UrlService.Pattern> {
                 val included = BooleanArray(rules.size)
                 val excluded = BooleanArray(rules.size)
 
@@ -71,7 +73,7 @@ object ProviderMatcher {
                     true
                 }
 
-                val out = ArrayList<UrlUtil.Pattern>()
+                val out = ArrayList<UrlService.Pattern>()
 
                 out.add(specialPattern)
 
@@ -84,6 +86,6 @@ object ProviderMatcher {
         })
     }
 
-    suspend fun relevantPatterns(url: String): List<UrlUtil.Pattern> = coroutineScope { scanner.eval(url) }
+    suspend fun relevantPatterns(url: String): List<UrlService.Pattern> = coroutineScope { scanner.eval(url) }
 
 }

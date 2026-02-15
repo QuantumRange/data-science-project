@@ -1,11 +1,9 @@
-package dev.qr.parquet
+package parquet
 
-import dev.qr.util.globalContext
 import dev.qr.util.parallelMap
-import kotlinx.coroutines.async
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -16,12 +14,12 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.avro.AvroParquetReader
 import org.apache.parquet.avro.AvroParquetWriter
 import org.apache.parquet.avro.AvroReadSupport
-import org.apache.parquet.example.Paper.schema
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 import org.apache.parquet.io.LocalInputFile
 import org.apache.parquet.io.LocalOutputFile
 import org.intellij.lang.annotations.Language
 import java.io.File
+import kotlin.coroutines.CoroutineContext
 
 object ParquetService {
 
@@ -33,6 +31,10 @@ object ParquetService {
     ) {
         val schema = Schema.Parser().parse(schema)!!
         val conf = Configuration()
+
+        if (file.exists()) {
+            file.delete()
+        }
 
         AvroParquetWriter.builder<GenericRecord>(LocalOutputFile(file.toPath()))
             .withSchema(schema)
@@ -51,12 +53,12 @@ object ParquetService {
         codec: CompressionCodecName = CompressionCodecName.ZSTD,
         block: suspend GenericRecord.(data: T) -> Unit
     ) = coroutineScope {
-        val parsedSchema = Schema.Parser().parse(schema)
+        val parsedSchema: Schema = Schema.Parser().parse(schema)!!
 
         write(
             file,
             schema,
-            data.parallelMap { GenericData.Record(parsedSchema).apply { block(it) } },
+            data.map { GenericData.Record(parsedSchema).apply { block(it) } },
             codec
         )
     }
@@ -82,7 +84,7 @@ object ParquetService {
                         emit(record)
                     }
                 }
-        }
+        }.flowOn(Dispatchers.IO)
     }
 
 }

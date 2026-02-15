@@ -1,0 +1,74 @@
+{
+  "type": "record",
+  "name": "Crawl",
+  "namespace": "example",
+  "fields": [
+    {
+      "name": "url",
+      "type": "long"
+    },
+    {
+      "name": "timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      },
+      "doc": "OffsetDateTime normalized to UTC; epoch millis."
+    },
+    {
+      "name": "duration",
+      "type": [
+        "null",
+        "long"
+      ],
+      "default": null,
+      "doc": "java.time.Duration encoded as total milliseconds."
+    },
+    {
+      "name": "version",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "status",
+      "type": [
+        "null",
+        "int"
+      ],
+      "default": null
+    },
+    {
+      "name": "header",
+      "type": [
+        "null",
+        {
+          "type": "map",
+          "values": {
+            "type": "array",
+            "items": "string"
+          }
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "content",
+      "type": [
+        "null",
+        "bytes"
+      ],
+      "default": null
+    },
+    {
+      "name": "content_type",
+      "type": [
+        "null",
+        "int"
+      ],
+      "default": null
+    }
+  ]
+}

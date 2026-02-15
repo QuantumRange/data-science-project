@@ -5,22 +5,23 @@ import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.newFixedThreadPoolContext
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Semaphore
 import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
 
-private val processors = Runtime.getRuntime().availableProcessors()
+private val threads = Runtime.getRuntime().availableProcessors() * 4
 
 @OptIn(DelicateCoroutinesApi::class)
 val globalContext = CoroutineScope(
     SupervisorJob()
-            + newFixedThreadPoolContext(processors * 4, "wk")
-            + Dispatchers.IO.limitedParallelism(processors * 2, "io")
+            + newFixedThreadPoolContext(threads, "wk")
+            + Dispatchers.IO.limitedParallelism(threads, "io")
 )
 
 fun runMain(
@@ -32,14 +33,20 @@ fun runMain(
 
 // https://medium.com/@josehhbraz/parallel-map-in-flow-kotlin-f9735c9dc237
 fun <T, R> Flow<T>.parallelMap(
-    context: CoroutineContext = EmptyCoroutineContext,
+    context: CoroutineContext = Dispatchers.Default,
     transform: suspend (T) -> R
 ): Flow<R> {
     val scope = CoroutineScope(context + SupervisorJob())
-    return map {
-        scope.async { transform(it) }
-    }
-        .buffer(1024)
-        .map { it.await() }
-        .flowOn(context)
+    val semaphore = Semaphore(threads)
+
+    return map { value ->
+        semaphore.acquire()
+        scope.async {
+            try {
+                transform(value)
+            } finally {
+                semaphore.release()
+            }
+        }
+    }.buffer(threads * 16).map { it.await() }.onCompletion { scope.cancel() }
 }

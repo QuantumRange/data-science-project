@@ -1,6 +1,7 @@
-package dev.qr.util
+package dev.qr.services
 
 import com.codahale.metrics.Meter
+import com.github.luben.zstd.ZstdInputStream
 import okhttp3.internal.format
 import org.rocksdb.BlockBasedTableConfig
 import org.rocksdb.BloomFilter
@@ -26,7 +27,7 @@ import java.security.MessageDigest
 /**
  * @author AI
  */
-object RocksUtil : Closeable {
+object RocksDBService : Closeable {
 
     private const val ESTIMATED_SIZE = 1_400_000_000L
 
@@ -93,7 +94,7 @@ object RocksUtil : Closeable {
         require(::db.isInitialized) { "Call open(dbDir) first." }
 
         val rawIn: InputStream = Files.newInputStream(inputFile)
-        val inStream: InputStream = com.github.luben.zstd.ZstdInputStream(rawIn)
+        val inStream: InputStream = ZstdInputStream(rawIn)
 
         var maxId = runCatching { idFile.readText().toLong() }.getOrNull() ?: 0L
 

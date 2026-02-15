@@ -1,13 +1,16 @@
-package dev.qr.util
+package dev.qr.services
 
-import io.ktor.http.*
-import io.ktor.util.*
+import io.ktor.http.URLBuilder
+import io.ktor.http.Url
+import io.ktor.http.decodeURLQueryComponent
+import io.ktor.http.toURI
+import io.ktor.util.toMap
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.net.URI
 
-object UrlUtil {
+object UrlService {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -72,7 +75,7 @@ object UrlUtil {
 
     // https://rules2.clearurls.xyz/data.minify.json
     val patterns = json.decodeFromString<ClearUrlData>(
-        (UrlUtil.javaClass.classLoader
+        (UrlService.javaClass.classLoader
             .getResource("data.minify.json") ?: error("Need clear url data"))
             .readText()
     ).providers.values.toList().map { raw ->
@@ -110,7 +113,7 @@ object UrlUtil {
         var runningUri = normalizedUri
 
         while (depth > 0) {
-            val patternsToScan = ProviderMatcher.relevantPatterns(runningUri.toString())
+            val patternsToScan = ProviderMatcherService.relevantPatterns(runningUri.toString())
             val urlStr = runningUri.toString()
 
             var newUri = false
