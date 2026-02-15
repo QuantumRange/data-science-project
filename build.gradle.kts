@@ -28,7 +28,7 @@ dependencies {
 
     // html
     implementation("io.ktor:ktor-client-core:3.3.3")
-    implementation("com.fleeksoft.ksoup:ksoup:0.2.5")
+    implementation("org.jsoup:jsoup:1.22.1")
     implementation("in.wilsonl.minifyhtml:minify-html:0.18.1")
 
     // xml
@@ -42,6 +42,7 @@ dependencies {
     implementation("org.rocksdb:rocksdbjni:10.4.2:linux64")
     implementation("com.github.luben:zstd-jni:1.5.7-6")
     implementation("com.gliwka.hyperscan:hyperscan:5.4.11-3.1.0")
+    implementation("io.github.ollama4j:ollama4j:1.1.6")
 
     testImplementation(kotlin("test"))
 }

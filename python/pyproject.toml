@@ -1,0 +1,10 @@
+[project]
+name = "python"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "pandas-stubs>=2.2.2.240807",
+    "pyarrow>=21.0.0",
+]

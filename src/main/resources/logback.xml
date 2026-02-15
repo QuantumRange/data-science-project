@@ -5,7 +5,18 @@
         </encoder>
     </appender>
 
-    <root level="warn">
+    <logger name="org.apache.parquet.hadoop.InternalParquetRecordReader"
+            level="WARN"
+            additivity="false">
+        <appender-ref ref="STDOUT"/>
+    </logger>
+    <logger name="org.apache.hadoop.io.compress.CodecPool"
+            level="WARN"
+            additivity="false">
+        <appender-ref ref="STDOUT"/>
+    </logger>
+
+    <root level="info">
         <appender-ref ref="STDOUT"/>
     </root>
 </configuration>
