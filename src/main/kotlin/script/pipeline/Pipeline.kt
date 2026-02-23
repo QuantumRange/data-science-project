@@ -1,7 +1,5 @@
-package scripts.pipeline
+package script.pipeline
 
-import dev.qr.scripts.pipeline.PipelineStorage
-import kotlinx.coroutines.supervisorScope
 import org.slf4j.LoggerFactory
 
 sealed interface Pipeline

@@ -1,4 +1,4 @@
-package scripts.pipeline.transformer
+package script.pipeline.transformer
 
 import dev.qr.parquet.ParquetSchema
 import parquet.ParquetService
@@ -9,7 +9,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.apache.avro.util.Utf8
 import org.slf4j.LoggerFactory
-import scripts.pipeline.MapPipeline
+import script.pipeline.MapPipeline
 import java.io.ByteArrayInputStream
 import java.nio.ByteBuffer
 import java.util.HashMap

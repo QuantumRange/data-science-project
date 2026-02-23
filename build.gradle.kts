@@ -43,6 +43,11 @@ dependencies {
     implementation("com.github.luben:zstd-jni:1.5.7-6")
     implementation("com.gliwka.hyperscan:hyperscan:5.4.11-3.1.0")
     implementation("io.github.ollama4j:ollama4j:1.1.6")
+    implementation("com.github.pemistahl:lingua:1.2.2")
+
+    implementation("org.apache.lucene:lucene-analysis-common:9.12.0")
+    implementation("org.apache.lucene:lucene-analysis-kuromoji:9.12.0")
+    implementation("org.apache.lucene:lucene-analysis-smartcn:9.12.0")
 
     testImplementation(kotlin("test"))
 }

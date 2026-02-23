@@ -1,0 +1,59 @@
+{
+  "type": "record",
+  "name": "Crawl",
+  "namespace": "example",
+  "fields": [
+    {
+      "name": "id",
+      "type": "long"
+    },
+    {
+      "name": "domain",
+      "type": "long"
+    },
+    {
+      "name": "url",
+      "type": "string"
+    },
+    {
+      "name": "timestamp",
+      "type": "long"
+    },
+    {
+      "name": "duration",
+      "type": "long"
+    },
+    {
+      "name": "http_version",
+      "type": "int"
+    },
+    {
+      "name": "status",
+      "type": "int"
+    },
+    {
+      "name": "header",
+      "type": "string"
+    },
+    {
+      "name": "type",
+      "type": "int"
+    },
+    {
+      "name": "lang",
+      "type": "string"
+    },
+    {
+      "name": "lang_confidence",
+      "type": "float"
+    },
+    {
+      "name": "text",
+      "type": "string"
+    },
+    {
+      "name": "outflow",
+      "type": "string"
+    }
+  ]
+}
