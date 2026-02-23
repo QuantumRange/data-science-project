@@ -1,4 +1,4 @@
-package scripts.pipeline.storage
+package script.pipeline.storage
 
 import dev.qr.scripts.pipeline.FileHolder
 import dev.qr.scripts.pipeline.PipelineStorage

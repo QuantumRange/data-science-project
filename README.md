@@ -1,6 +1,13 @@
 # Data Science Project
 
+| Stage               | Size  |
+|---------------------|-------|
+| Raw GZIP Compressed | 511GB |
+| ZSTD Recommpressed  | 372GB |
+| HTML -> Text        | 232GB |
+
 Domains:
+
 ```shell
 docker compose exec -T db \
   psql -U postgres -d postgres \
@@ -12,6 +19,7 @@ docker compose exec -T db \
 ```
 
 copy urls
+
 ```shell
 docker compose exec -T db \
   psql -U postgres -d postgres \

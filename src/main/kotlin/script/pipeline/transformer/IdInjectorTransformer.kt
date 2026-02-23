@@ -1,4 +1,4 @@
-package scripts.pipeline.transformer
+package script.pipeline.transformer
 
 import dev.qr.model.BodyKind
 import dev.qr.model.ProtocolVersion
@@ -14,7 +14,7 @@ import org.apache.avro.generic.GenericRecord
 import org.apache.avro.util.Utf8
 import org.slf4j.LoggerFactory
 import parquet.ParquetService
-import scripts.pipeline.MapPipeline
+import script.pipeline.MapPipeline
 import java.io.File
 import kotlin.io.path.Path
 

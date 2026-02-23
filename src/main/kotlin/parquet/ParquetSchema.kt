@@ -9,5 +9,6 @@ object ParquetSchema {
     val CRAWL_V3 = load("crawl_v3")
     val CRAWL_ID = load("crawl_v3_id")
     val CRAWL_V4 = load("crawl_v4")
+    val CRAWL_V5 = load("crawl_v5")
 
 }

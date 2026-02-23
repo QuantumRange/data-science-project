@@ -11,7 +11,7 @@ import org.apache.avro.util.Utf8
 import org.jsoup.Jsoup
 import org.slf4j.LoggerFactory
 import parquet.ParquetService
-import scripts.pipeline.MapPipeline
+import script.pipeline.MapPipeline
 import util.textMeter
 
 object TextTransformer : MapPipeline(

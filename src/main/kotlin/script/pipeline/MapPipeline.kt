@@ -1,4 +1,4 @@
-package scripts.pipeline
+package script.pipeline
 
 import dev.qr.scripts.pipeline.FileHolder
 import dev.qr.scripts.pipeline.PipelineStorage
@@ -7,7 +7,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
