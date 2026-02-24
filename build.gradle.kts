@@ -1,10 +1,16 @@
 plugins {
     kotlin("jvm") version "2.3.0"
     kotlin("plugin.serialization") version "2.3.0"
+
+    application
 }
 
 group = "dev.qr"
 version = "1.0-SNAPSHOT"
+
+application {
+    mainClass.set("script.MigrateCrawlsKt")
+}
 
 repositories {
     mavenCentral()
@@ -44,6 +50,7 @@ dependencies {
     implementation("com.gliwka.hyperscan:hyperscan:5.4.11-3.1.0")
     implementation("io.github.ollama4j:ollama4j:1.1.6")
     implementation("com.github.pemistahl:lingua:1.2.2")
+    implementation("com.github.vinhkhuc:jfasttext:0.5")
 
     implementation("org.apache.lucene:lucene-analysis-common:9.12.0")
     implementation("org.apache.lucene:lucene-analysis-kuromoji:9.12.0")

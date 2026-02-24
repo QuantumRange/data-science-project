@@ -84,7 +84,7 @@ object RocksDBService : Closeable {
         cfId2Url = handles[2]
     }
 
-    private val idFile = File("data/urls.meta.id")
+    private val idFile = File("/dat/proj/kotlin/2026/data-science-project/data/urls.meta.id")
 
     fun loadFromPostgresBinaryCopy(
         inputFile: Path,

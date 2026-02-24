@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.slf4j.Logger
+import script.globalTarget
 import util.progressBar
 import kotlin.system.exitProcess
 
@@ -25,6 +26,7 @@ abstract class MapPipeline(val log: Logger, val maxParallel: Int) : Pipeline {
 
         val sourceObjects = sourceStorage.getObjects()
         val existingTargets = targetStorage.getObjects().map { it.name }.toSet()
+        val globalTargets = globalTarget.getObjects().map { it.name }.toSet()
 
         sourceObjects
             .map { source ->
@@ -35,7 +37,23 @@ abstract class MapPipeline(val log: Logger, val maxParallel: Int) : Pipeline {
                         return@async
                     }
 
+                    if (sourceStorage != globalTarget && source.name in globalTargets) {
+                        progressBar.silentInc(1)
+                        return@async
+                    }
+
                     semaphore.withPermit {
+                        val sourceData = source.files["data"]
+                        if (sourceData != null && sourceData.exists() && sourceData.length() == 0L) {
+                            log.warn(
+                                "Skipping '{}' because data file is empty: {}",
+                                source.name,
+                                sourceData.absolutePath
+                            )
+                            progressBar.inc(1)
+                            return@withPermit
+                        }
+
                         val target = targetStorage.allocate(source.name)
 
                         val result = runCatching {
@@ -49,7 +67,7 @@ abstract class MapPipeline(val log: Logger, val maxParallel: Int) : Pipeline {
 
                         withContext(NonCancellable) {
                             if (sourceStorage.isWrite) {
-                                source.files.values.forEach { it.delete() }
+//                                source.files.values.forEach { it.delete() }
                             }
                         }
 

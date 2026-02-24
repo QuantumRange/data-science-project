@@ -1,7 +1,6 @@
 package service
 
-import com.github.pemistahl.lingua.api.Language
-import com.github.pemistahl.lingua.api.LanguageDetectorBuilder
+import com.github.jfasttext.JFastText
 import org.apache.lucene.analysis.Analyzer
 import org.apache.lucene.analysis.ar.ArabicAnalyzer
 import org.apache.lucene.analysis.bg.BulgarianAnalyzer
@@ -46,32 +45,14 @@ import org.apache.lucene.analysis.ta.TamilAnalyzer
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import org.apache.lucene.analysis.tr.TurkishAnalyzer
 import kotlin.jvm.java
-
-// @author ChatGPT
-private class KStemEnglishAnalyzer : Analyzer() {
-    override fun createComponents(fieldName: String): TokenStreamComponents {
-        val tokenizer = StandardTokenizer()
-
-        val stream = KStemFilter(
-            org.apache.lucene.analysis.StopFilter(
-                LowerCaseFilter(
-                    EnglishPossessiveFilter(tokenizer)
-                ),
-                EnglishAnalyzer.getDefaultStopSet()
-            )
-        )
-
-        return TokenStreamComponents(tokenizer, stream)
-    }
-}
+import kotlin.math.exp
 
 object StemService {
 
     private val detector by lazy {
-        LanguageDetectorBuilder
-            .fromAllLanguages()
-            .withPreloadedLanguageModels()
-            .build()
+        JFastText().apply {
+            loadModel("/mnt/Fast2T/kotlin/2026/data-science-project/lid.176.ftz")
+        }
     }
 
     // @author ChatGPT
@@ -85,7 +66,7 @@ object StemService {
         "CZECH" to CzechAnalyzer(),
         "DANISH" to DanishAnalyzer(),
         "DUTCH" to DutchAnalyzer(),
-        "ENGLISH" to KStemEnglishAnalyzer(),
+        "ENGLISH" to KStemEnglishAnalyzer,
         "ESTONIAN" to EstonianAnalyzer(),
         "FINNISH" to FinnishAnalyzer(),
         "FRENCH" to FrenchAnalyzer(),
@@ -118,21 +99,64 @@ object StemService {
     private val fallback = StandardAnalyzer()
 
     fun detectLanguage(text: String): LanguageResult? {
-        val result = detector.computeLanguageConfidenceValues(text)
-            .maxByOrNull { it.value }
-            ?: return null
+        val sample = text.take(300).replace("\n", " ")
+        val prediction: JFastText.ProbLabel = detector.predictProba(sample) ?: return null
 
-        if (result.key == Language.UNKNOWN)
-            return null
+        val label = prediction.label
+            .removePrefix("__label__")
+            .uppercase()
 
         return LanguageResult(
-            language = result.key.name,
-            confidence = result.value
+            language = isoToLanguage[label] ?: label,
+            confidence = exp(prediction.logProb.toDouble())
         )
     }
 
+    // @author ChatGPT
+    private val isoToLanguage = mapOf(
+        "AR" to "ARABIC",
+        "HY" to "ARMENIAN",
+        "EU" to "BASQUE",
+        "BN" to "BENGALI",
+        "BG" to "BULGARIAN",
+        "CA" to "CATALAN",
+        "CS" to "CZECH",
+        "DA" to "DANISH",
+        "NL" to "DUTCH",
+        "EN" to "ENGLISH",
+        "ET" to "ESTONIAN",
+        "FI" to "FINNISH",
+        "FR" to "FRENCH",
+        "GL" to "GALICIAN",
+        "DE" to "GERMAN",
+        "EL" to "GREEK",
+        "HI" to "HINDI",
+        "HU" to "HUNGARIAN",
+        "ID" to "INDONESIAN",
+        "GA" to "IRISH",
+        "IT" to "ITALIAN",
+        "LV" to "LATVIAN",
+        "LT" to "LITHUANIAN",
+        "NO" to "BOKMAL",
+        "NB" to "BOKMAL",
+        "NN" to "NYNORSK",
+        "FA" to "PERSIAN",
+        "PT" to "PORTUGUESE",
+        "RO" to "ROMANIAN",
+        "RU" to "RUSSIAN",
+        "SR" to "SERBIAN",
+        "ES" to "SPANISH",
+        "SV" to "SWEDISH",
+        "TA" to "TAMIL",
+        "TR" to "TURKISH",
+        "JA" to "JAPANESE",
+        "ZH" to "CHINESE",
+        "KO" to "KOREAN"
+    )
+
     fun processText(text: String, language: String?): String {
         val analyzer = language.let { analyzers[it] } ?: fallback
+
         val tokenStream = analyzer.tokenStream("text", text)
         val charTermAttr = tokenStream.addAttribute(CharTermAttribute::class.java)
         tokenStream.reset()
@@ -153,5 +177,23 @@ object StemService {
         val language: String,
         val confidence: Double
     )
+
+    // @author ChatGPT
+    private object KStemEnglishAnalyzer : Analyzer() {
+        override fun createComponents(fieldName: String): TokenStreamComponents {
+            val tokenizer = StandardTokenizer()
+
+            val stream = KStemFilter(
+                org.apache.lucene.analysis.StopFilter(
+                    LowerCaseFilter(
+                        EnglishPossessiveFilter(tokenizer)
+                    ),
+                    EnglishAnalyzer.getDefaultStopSet()
+                )
+            )
+
+            return TokenStreamComponents(tokenizer, stream)
+        }
+    }
 
 }

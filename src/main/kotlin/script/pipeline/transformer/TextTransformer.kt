@@ -1,4 +1,4 @@
-package dev.qr.scripts.pipeline.transformer
+package dev.qr.script.pipeline.transformer
 
 import dev.qr.model.BodyKind
 import dev.qr.parquet.ParquetSchema
@@ -62,11 +62,9 @@ object TextTransformer : MapPipeline(
 
             put("text", text)
             put("links", Json.encodeToString(links))
-            textMeter.mark()
         }
 
         source["meta"].copyTo(target["meta"], overwrite = true)
-        source["id"].copyTo(target["id"], overwrite = true)
     }
 
 }

@@ -20,11 +20,11 @@ import kotlin.io.path.Path
 
 object IdInjectorTransformer : MapPipeline(
     LoggerFactory.getLogger(IdInjectorTransformer::class.java),
-    6
+    32
 ) {
 
     init {
-        RocksDBService.open(Path("./db"))
+        RocksDBService.open(Path("/dat/proj/kotlin/2026/data-science-project/db"))
 
         Runtime.getRuntime().addShutdownHook(Thread {
             RocksDBService.close()
@@ -35,8 +35,6 @@ object IdInjectorTransformer : MapPipeline(
         source: FileHolder,
         target: FileHolder
     ) {
-        source["meta"].copyTo(target["meta"], overwrite = true)
-
         val ids = mutableSetOf<Long>()
 
         val flow = ParquetService.read(source["data"], ParquetSchema.CRAWL_V2)
@@ -48,15 +46,13 @@ object IdInjectorTransformer : MapPipeline(
             .onEach { ids.add(it.get("url") as Long) }
 
         ParquetService.write(target["data"], ParquetSchema.CRAWL_V3, flow) { processRecords(it) }
-        ParquetService.write(target["id"], ParquetSchema.CRAWL_ID, ids.asFlow()) { id ->
-            put("id", id)
-            put("url", RocksDBService.getUrl(id)!!)
-        }
+
+        source["meta"].copyTo(target["meta"], overwrite = true)
     }
 
     private val domainLookup by lazy {
         HashMap<String, Long>(
-            File("data/domain.csv")
+            File("/dat/proj/kotlin/2026/data-science-project/data/domain.csv")
                 .readLines()
                 .drop(1)
                 .associate {

@@ -13,7 +13,6 @@ object IdInjectedStorage : PipelineStorage {
         name,
         mapOf(
             "data" to File(directory, "$name.parquet"),
-            "id" to File(directory, "$name.parquet.id.parquet"),
             "meta" to File(directory, "$name.parquet.meta.json"),
         )
     )
