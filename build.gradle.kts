@@ -43,6 +43,10 @@ dependencies {
     implementation("io.github.pdvrieze.xmlutil:serialization-jvm:0.91.3")
     implementation("com.prof18.rssparser:rssparser:6.1.1")
 
+    // ktor
+    implementation("io.ktor:ktor-client-core:3.4.0")
+    implementation("io.ktor:ktor-client-cio:3.4.0")
+
     // misc
     implementation("ch.qos.logback:logback-classic:1.5.28")
     implementation("io.dropwizard.metrics:metrics-core:4.2.28")
