@@ -18,8 +18,8 @@ import org.apache.parquet.hadoop.metadata.CompressionCodecName
 import org.apache.parquet.io.LocalInputFile
 import org.apache.parquet.io.LocalOutputFile
 import org.intellij.lang.annotations.Language
+import util.textMeter
 import java.io.File
-import kotlin.coroutines.CoroutineContext
 
 object ParquetService {
 
@@ -58,7 +58,11 @@ object ParquetService {
         write(
             file,
             schema,
-            data.map { GenericData.Record(parsedSchema).apply { block(it) } },
+            data.map {
+                GenericData.Record(parsedSchema)
+                    .apply { block(it) }
+                    .also { textMeter.mark() }
+            },
             codec
         )
     }
@@ -80,8 +84,22 @@ object ParquetService {
                 .build()
                 .use { reader ->
                     while (true) {
-                        val record = reader.read() ?: break
-                        emit(record)
+                        try {
+                            val record = reader.read() ?: break
+                            emit(record)
+                        } catch (e: RuntimeException) {
+                            if (e.message?.contains("is not a Parquet file") == true) {
+                                if (!file.absolutePath.contains("qr/data")) {
+                                    println("Invalid parquet file ${file.absoluteFile}!")
+                                }
+                            }
+
+                            e.printStackTrace()
+                            Runtime.getRuntime().exit(-1)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            Runtime.getRuntime().exit(-1)
+                        }
                     }
                 }
         }.flowOn(Dispatchers.IO)

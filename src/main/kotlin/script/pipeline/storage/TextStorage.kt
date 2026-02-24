@@ -1,4 +1,4 @@
-package dev.qr.scripts.pipeline.storage
+package dev.qr.script.pipeline.storage
 
 import dev.qr.scripts.pipeline.FileHolder
 import dev.qr.scripts.pipeline.PipelineStorage
@@ -13,7 +13,6 @@ object TextStorage : PipelineStorage {
         name,
         mapOf(
             "data" to File(directory, "$name.parquet"),
-            "id" to File(directory, "$name.parquet.id.parquet"),
             "meta" to File(directory, "$name.parquet.meta.json"),
         )
     )

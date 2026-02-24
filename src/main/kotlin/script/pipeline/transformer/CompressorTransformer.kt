@@ -17,15 +17,13 @@ import java.util.zip.GZIPInputStream
 
 object CompressorTransformer : MapPipeline(
     LoggerFactory.getLogger(CompressorTransformer::class.java),
-    8
+    32
 ) {
 
     override suspend fun transform(
         source: FileHolder,
         target: FileHolder
     ) {
-        source["meta"].copyTo(target["meta"], overwrite = true)
-
         ParquetService.write(
             target["data"],
             ParquetSchema.CRAWL_V2,
@@ -55,6 +53,8 @@ object CompressorTransformer : MapPipeline(
                 key.toString() to JsonArray(value.map { v -> JsonPrimitive(v.toString()) })
             }.toMap()))
         }
+
+        source["meta"].copyTo(target["meta"], overwrite = true)
     }
 
 }
