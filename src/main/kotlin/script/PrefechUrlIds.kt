@@ -1,9 +1,8 @@
 package dev.qr.scripts
 
 import dev.qr.services.RocksDBService
-import dev.qr.util.runMain
+import dev.qr.extension.runMain
 import kotlin.io.path.Path
-import kotlin.system.exitProcess
 
 fun main(): Unit = runMain {
     println("Preparing db...")

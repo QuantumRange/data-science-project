@@ -4,17 +4,11 @@ import dev.qr.script.pipeline.storage.TextStorage
 import dev.qr.script.pipeline.transformer.LinkProcessingTransformer
 import dev.qr.scripts.pipeline.PipelineStorage
 import dev.qr.script.pipeline.storage.LinkStorage
-import dev.qr.script.pipeline.transformer.TextTransformer
-import dev.qr.util.runMain
+import dev.qr.extension.runMain
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
-import script.pipeline.storage.CompressedStorage
-import script.pipeline.storage.IdInjectedStorage
-import script.pipeline.storage.SourceStorage
-import script.pipeline.transformer.CompressorTransformer
-import script.pipeline.transformer.IdInjectorTransformer
 
 private object MigrateCrawls
 

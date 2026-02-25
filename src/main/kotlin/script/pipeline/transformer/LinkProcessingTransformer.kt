@@ -6,14 +6,12 @@ import io.ktor.http.*
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
-import org.apache.avro.generic.GenericRecord
 import org.apache.avro.util.Utf8
 import org.slf4j.LoggerFactory
 import parquet.ParquetService
 import script.pipeline.MapPipeline
 import service.StemService
 import java.io.File
-import kotlin.coroutines.suspendCoroutine
 
 object LinkProcessingTransformer : MapPipeline(
     LoggerFactory.getLogger(LinkProcessingTransformer::class.java),
@@ -38,8 +36,8 @@ object LinkProcessingTransformer : MapPipeline(
                     put("text", "")
                 } else {
                     val result = StemService.detectLanguage(text)
-                    val language = result?.language
-                    val stemmedText = StemService.processText(text, language)
+                    val language: String? = result?.language
+                    val stemmedText: String = StemService.processText(text, language)
 
                     put("lang", result?.language ?: "UNKNOWN")
                     put("lang_confidence", result?.confidence ?: 0.0)

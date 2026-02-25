@@ -1,4 +1,4 @@
-package dev.qr.util
+package dev.qr.extension
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi

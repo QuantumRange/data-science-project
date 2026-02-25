@@ -1,6 +1,5 @@
 package parquet
 
-import dev.qr.util.parallelMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -69,13 +68,15 @@ object ParquetService {
 
     suspend fun read(
         file: File,
-        @Language("JSON") schema: String
+        @Language("JSON") schema: String?
     ): Flow<GenericRecord> {
-        val schema = Schema.Parser().parse(schema)
+        val schema = schema?.let { Schema.Parser().parse(it) }
 
         val configuration: Configuration = Configuration().apply {
-            AvroReadSupport.setAvroReadSchema(this, schema)
-            AvroReadSupport.setRequestedProjection(this, schema)
+            if (schema != null) {
+                AvroReadSupport.setAvroReadSchema(this, schema)
+                AvroReadSupport.setRequestedProjection(this, schema)
+            }
         }
 
         return flow {
