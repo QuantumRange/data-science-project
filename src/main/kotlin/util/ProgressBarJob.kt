@@ -1,7 +1,7 @@
 package util
 
 import com.codahale.metrics.Meter
-import dev.qr.util.globalContext
+import dev.qr.extension.globalContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive

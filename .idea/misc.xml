@@ -4,8 +4,8 @@
   </component>
   <component name="ExternalStorageConfigurationManager" enabled="true" />
   <component name="FrameworkDetectionExcludesConfiguration">
-    <file type="web" url="file://$PROJECT_DIR$" />
     <file type="web" url="file:///mnt/Fast2T/kotlin/2026/data-science-project" />
+    <file type="web" url="file://$PROJECT_DIR$" />
   </component>
   <component name="ProjectRootManager" version="2" languageLevel="JDK_22" project-jdk-name="uv (data-science-project)" project-jdk-type="Python SDK">
     <output url="file://$PROJECT_DIR$/out" />

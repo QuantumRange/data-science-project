@@ -8,15 +8,14 @@ import org.apache.lucene.analysis.bn.BengaliAnalyzer
 import org.apache.lucene.analysis.ca.CatalanAnalyzer
 import org.apache.lucene.analysis.cjk.CJKAnalyzer
 import org.apache.lucene.analysis.cn.smart.SmartChineseAnalyzer
+import org.apache.lucene.analysis.core.LowerCaseFilter
 import org.apache.lucene.analysis.cz.CzechAnalyzer
 import org.apache.lucene.analysis.da.DanishAnalyzer
 import org.apache.lucene.analysis.de.GermanAnalyzer
 import org.apache.lucene.analysis.el.GreekAnalyzer
-import org.apache.lucene.analysis.core.LowerCaseFilter
 import org.apache.lucene.analysis.en.EnglishAnalyzer
 import org.apache.lucene.analysis.en.EnglishPossessiveFilter
 import org.apache.lucene.analysis.en.KStemFilter
-import org.apache.lucene.analysis.standard.StandardTokenizer
 import org.apache.lucene.analysis.es.SpanishAnalyzer
 import org.apache.lucene.analysis.et.EstonianAnalyzer
 import org.apache.lucene.analysis.eu.BasqueAnalyzer
@@ -40,11 +39,11 @@ import org.apache.lucene.analysis.ro.RomanianAnalyzer
 import org.apache.lucene.analysis.ru.RussianAnalyzer
 import org.apache.lucene.analysis.sr.SerbianAnalyzer
 import org.apache.lucene.analysis.standard.StandardAnalyzer
+import org.apache.lucene.analysis.standard.StandardTokenizer
 import org.apache.lucene.analysis.sv.SwedishAnalyzer
 import org.apache.lucene.analysis.ta.TamilAnalyzer
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import org.apache.lucene.analysis.tr.TurkishAnalyzer
-import kotlin.jvm.java
 import kotlin.math.exp
 
 object StemService {
@@ -99,7 +98,7 @@ object StemService {
     private val fallback = StandardAnalyzer()
 
     fun detectLanguage(text: String): LanguageResult? {
-        val sample = text.take(300).replace("\n", " ")
+        val sample = text.take(3000).replace("\n", " ")
         val prediction: JFastText.ProbLabel = detector.predictProba(sample) ?: return null
 
         val label = prediction.label
@@ -154,6 +153,8 @@ object StemService {
         "KO" to "KOREAN"
     )
 
+    private val specialCharacters = ".,+*#!\"§$%&/()=?0123456789*+<>^°\n[]{}".toSet()
+
     fun processText(text: String, language: String?): String {
         val analyzer = language.let { analyzers[it] } ?: fallback
 
@@ -163,7 +164,11 @@ object StemService {
 
         val tokens = buildList {
             while (tokenStream.incrementToken()) {
-                add(charTermAttr.toString())
+                val word = charTermAttr.toString()
+
+                if (word.none { it in specialCharacters }) {
+                    add(word)
+                }
             }
         }
 
