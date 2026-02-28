@@ -107,42 +107,42 @@ def find_top_words():
         .sink_parquet("/mnt/Fast2T/data/ai-training-set/total-words/wiki.parquet", compression="zstd",
                       maintain_order=False)
     )
+    #
+    # (
+    #     pl.scan_parquet(AI_FILES)
+    #     .select(pl.col("term"), pl.col("len"))
+    #     .group_by(pl.col("term"))
+    #     .agg(pl.col("len").sum())
+    #     .with_columns(type=1)
+    #     .sink_parquet("/mnt/Fast2T/data/ai-training-set/total-words/ai.parquet", compression="zstd",
+    #                   maintain_order=False)
+    # )
+    #
+    # i = 0
+    # for files in tqdm(chunk_array(WEBSITE_FILES, 64)):
+    #     (
+    #         pl.scan_parquet(files)
+    #         .select(pl.col("term"), pl.col("len"))
+    #         .group_by(pl.col("term"))
+    #         .agg(pl.col("len").sum())
+    #         .sink_parquet("/mnt/Fast2T/data/ai-training-set/total-words/tmp.website-" + str(i) + ".parquet",
+    #                       compression="zstd",
+    #                       maintain_order=False)
+    #     )
+    #     i += 1
+    #
+    # (
+    #     pl.scan_parquet(sorted(glob.glob("/mnt/Fast2T/data/ai-training-set/total-words/tmp.website-*.parquet")))
+    #     .select(pl.col("term"), pl.col("len"))
+    #     .group_by(pl.col("term"))
+    #     .agg(pl.col("len").sum())
+    #     .with_columns(type=2)
+    #     .sink_parquet("/mnt/Fast2T/data/ai-training-set/total-words/website.parquet",
+    #                   compression="zstd",
+    #                   maintain_order=False)
+    # )
 
-    (
-        pl.scan_parquet(AI_FILES)
-        .select(pl.col("term"), pl.col("len"))
-        .group_by(pl.col("term"))
-        .agg(pl.col("len").sum())
-        .with_columns(type=1)
-        .sink_parquet("/mnt/Fast2T/data/ai-training-set/total-words/ai.parquet", compression="zstd",
-                      maintain_order=False)
-    )
-
-    i = 0
-    for files in tqdm(chunk_array(WEBSITE_FILES, 64)):
-        (
-            pl.scan_parquet(files)
-            .select(pl.col("term"), pl.col("len"))
-            .group_by(pl.col("term"))
-            .agg(pl.col("len").sum())
-            .sink_parquet("/mnt/Fast2T/data/ai-training-set/total-words/tmp.website-" + str(i) + ".parquet",
-                          compression="zstd",
-                          maintain_order=False)
-        )
-        i += 1
-
-    (
-        pl.scan_parquet(sorted(glob.glob("/mnt/Fast2T/data/ai-training-set/total-words/tmp.website-*.parquet")))
-        .select(pl.col("term"), pl.col("len"))
-        .group_by(pl.col("term"))
-        .agg(pl.col("len").sum())
-        .with_columns(type=2)
-        .sink_parquet("/mnt/Fast2T/data/ai-training-set/total-words/website.parquet",
-                      compression="zstd",
-                      maintain_order=False)
-    )
-
-# find_top_words()
+find_top_words()
 
 def word_analysis():
     categories = ["ai", "website", "wiki"]
@@ -173,33 +173,33 @@ def word_analysis():
 
 # word_analysis()
 
-df = pl.read_parquet("/mnt/Fast2T/data/ai-training-set/total-words/all.parquet")
-
-print(
-    df
-    .group_by("term").agg(pl.col("len").sum())
-    .top_k(k=20_000, by='len')
-)
-
-type_amount = df.group_by("type").len().count()["type"][0]
-
-f = df.group_by("term").agg(pl.col("len").sum())
-tf = (df
-      .join(f, left_on="term", right_on="term")
-      .with_columns(tf=pl.col("len") / pl.col("len_right"))
-      .drop("len_right", "total"))
-idf = (df.group_by("term")
-       .agg(pl.col("type"))
-       .with_columns(idf=(type_amount / pl.col("type").list.len()).log())
-       .drop("type"))
-
-tf_idf = (tf
-          .join(idf, left_on="term", right_on="term")
-          .with_columns(tf_idf=pl.col("tf") * pl.col("idf"))
-          .drop("tf", "idf")
-          .sort("tf_idf", descending=True)
-          .filter(pl.col("tf_idf") != 0))
-
-print(tf_idf.filter(pl.col("type") == 0))
-print(tf_idf.filter(pl.col("type") == 1))
-print(tf_idf.filter(pl.col("type") == 2))
+# df = pl.read_parquet("/mnt/Fast2T/data/ai-training-set/total-words/all.parquet")
+#
+# print(
+#     df
+#     .group_by("term").agg(pl.col("len").sum())
+#     .top_k(k=20_000, by='len')
+# )
+#
+# type_amount = df.group_by("type").len().count()["type"][0]
+#
+# f = df.group_by("term").agg(pl.col("len").sum())
+# tf = (df
+#       .join(f, left_on="term", right_on="term")
+#       .with_columns(tf=pl.col("len") / pl.col("len_right"))
+#       .drop("len_right", "total"))
+# idf = (df.group_by("term")
+#        .agg(pl.col("type"))
+#        .with_columns(idf=(type_amount / pl.col("type").list.len()).log())
+#        .drop("type"))
+#
+# tf_idf = (tf
+#           .join(idf, left_on="term", right_on="term")
+#           .with_columns(tf_idf=pl.col("tf") * pl.col("idf"))
+#           .drop("tf", "idf")
+#           .sort("tf_idf", descending=True)
+#           .filter(pl.col("tf_idf") != 0))
+#
+# print(tf_idf.filter(pl.col("type") == 0))
+# print(tf_idf.filter(pl.col("type") == 1))
+# print(tf_idf.filter(pl.col("type") == 2))
