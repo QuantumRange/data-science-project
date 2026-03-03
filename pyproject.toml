@@ -20,6 +20,10 @@ dependencies = [
     "ipykernel>=7.2.0",
     "scikit-learn>=1.8.0",
     "seaborn>=0.13.2",
+    "networkit>=11.2.1",
+    "warcio>=1.7.5",
+    "ipywidgets>=8.1.8",
+    "isal>=1.8.0",
 ]
 
 [[tool.uv.index]]

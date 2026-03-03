@@ -8,16 +8,7 @@
         <option name="gradleJvm" value="corretto-25" />
         <option name="modules">
           <set>
-            <option value="/mnt/Fast2T/kotlin/2026/data-science-project" />
-          </set>
-        </option>
-      </GradleProjectSettings>
-      <GradleProjectSettings>
-        <option name="externalProjectPath" value="/mnt/Fast2T/kotlin/2026/data-science-project" />
-        <option name="gradleJvm" value="corretto-25" />
-        <option name="modules">
-          <set>
-            <option value="/mnt/Fast2T/kotlin/2026/data-science-project" />
+            <option value="$PROJECT_DIR$" />
           </set>
         </option>
       </GradleProjectSettings>

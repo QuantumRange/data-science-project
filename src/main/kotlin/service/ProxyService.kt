@@ -79,7 +79,7 @@ object ProxyService {
                                 val credentials =
                                     Base64.getEncoder().encodeToString("${dat[2]}:${dat[3]}".toByteArray())
                                 header(HttpHeaders.ProxyAuthorization, "Basic $credentials")
-                                userAgent("Spider/1.0 no data gets used for ai or is being sold, personal project!")
+//                                userAgent("Spider/1.0 no data gets used for ai or is being sold, personal project!")
                             }
                             engine {
                                 proxy = Proxy(Proxy.Type.HTTP, InetSocketAddress(dat[0], dat[1].toInt()))

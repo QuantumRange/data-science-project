@@ -107,40 +107,40 @@ def find_top_words():
         .sink_parquet("/mnt/Fast2T/data/ai-training-set/total-words/wiki.parquet", compression="zstd",
                       maintain_order=False)
     )
-    #
-    # (
-    #     pl.scan_parquet(AI_FILES)
-    #     .select(pl.col("term"), pl.col("len"))
-    #     .group_by(pl.col("term"))
-    #     .agg(pl.col("len").sum())
-    #     .with_columns(type=1)
-    #     .sink_parquet("/mnt/Fast2T/data/ai-training-set/total-words/ai.parquet", compression="zstd",
-    #                   maintain_order=False)
-    # )
-    #
-    # i = 0
-    # for files in tqdm(chunk_array(WEBSITE_FILES, 64)):
-    #     (
-    #         pl.scan_parquet(files)
-    #         .select(pl.col("term"), pl.col("len"))
-    #         .group_by(pl.col("term"))
-    #         .agg(pl.col("len").sum())
-    #         .sink_parquet("/mnt/Fast2T/data/ai-training-set/total-words/tmp.website-" + str(i) + ".parquet",
-    #                       compression="zstd",
-    #                       maintain_order=False)
-    #     )
-    #     i += 1
-    #
-    # (
-    #     pl.scan_parquet(sorted(glob.glob("/mnt/Fast2T/data/ai-training-set/total-words/tmp.website-*.parquet")))
-    #     .select(pl.col("term"), pl.col("len"))
-    #     .group_by(pl.col("term"))
-    #     .agg(pl.col("len").sum())
-    #     .with_columns(type=2)
-    #     .sink_parquet("/mnt/Fast2T/data/ai-training-set/total-words/website.parquet",
-    #                   compression="zstd",
-    #                   maintain_order=False)
-    # )
+
+    (
+        pl.scan_parquet(AI_FILES)
+        .select(pl.col("term"), pl.col("len"))
+        .group_by(pl.col("term"))
+        .agg(pl.col("len").sum())
+        .with_columns(type=1)
+        .sink_parquet("/mnt/Fast2T/data/ai-training-set/total-words/ai.parquet", compression="zstd",
+                      maintain_order=False)
+    )
+
+    i = 0
+    for files in tqdm(chunk_array(WEBSITE_FILES, 64)):
+        (
+            pl.scan_parquet(files)
+            .select(pl.col("term"), pl.col("len"))
+            .group_by(pl.col("term"))
+            .agg(pl.col("len").sum())
+            .sink_parquet("/mnt/Fast2T/data/ai-training-set/total-words/tmp.website-" + str(i) + ".parquet",
+                          compression="zstd",
+                          maintain_order=False)
+        )
+        i += 1
+
+    (
+        pl.scan_parquet(sorted(glob.glob("/mnt/Fast2T/data/ai-training-set/total-words/tmp.website-*.parquet")))
+        .select(pl.col("term"), pl.col("len"))
+        .group_by(pl.col("term"))
+        .agg(pl.col("len").sum())
+        .with_columns(type=2)
+        .sink_parquet("/mnt/Fast2T/data/ai-training-set/total-words/website.parquet",
+                      compression="zstd",
+                      maintain_order=False)
+    )
 
 find_top_words()
 
