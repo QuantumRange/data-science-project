@@ -34,6 +34,7 @@ dependencies {
 
     // html
     implementation("io.ktor:ktor-client-core:3.3.3")
+    implementation("io.ktor:ktor-client-cio:3.3.3")
     implementation("org.jsoup:jsoup:1.22.1")
     implementation("in.wilsonl.minifyhtml:minify-html:0.18.1")
 

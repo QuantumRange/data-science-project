@@ -1,12 +1,12 @@
+from concurrent.futures import ThreadPoolExecutor
+
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
 from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor
 
 from python.ai_training.dataset import load_shard
-from python.ai_training.lib import DATASET_DIR, SHARD_COUNT, EPOCH_COUNT, SHARD_DIR, TEST_SHARD_COUNT
+from python.ai_training.lib import DATASET_DIR, SHARD_COUNT, EPOCH_COUNT, TEST_SHARD_COUNT
 from python.ai_training.network import SentenceClassificationNetwork
 from python.ai_training.visualizer import render_epoch
 
