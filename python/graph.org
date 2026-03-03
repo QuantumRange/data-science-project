@@ -1,19 +1,19 @@
-#+property: header-args:jupyter-python :session *jupyter* :eval no-export :async yes :tangle gen_graph.py :prologue "%%time" :exports both
+#+property: header-args:python :session *jupyter* :eval no-export :async yes :tangle gen_graph.py :prologue "%%time" :exports both
 
 * Read Graph
 
-#+begin_src jupyter-python :noweb yes :exports none :results none
+#+begin_src python :noweb yes :exports none :results none
   <<imports>>
 #+end_src
 
 First we need to load the data from the /parquet/ file. The tangled
 script will take the file name using a command line argument.
 
-#+begin_src jupyter-python :eval no :noweb-ref imports :tangle no
+#+begin_src python :eval no :noweb-ref imports :tangle no
   import sys
 #+end_src
 
-#+begin_src jupyter-python :eval no
+#+begin_src python :eval no
   if len(sys.argv) >= 1:
       datafile = sys.argv[1]
   else:
@@ -22,13 +22,13 @@ script will take the file name using a command line argument.
 
 In the org file it suffices to change the datafile header variable.
 
-#+begin_src jupyter-python :noweb-ref imports :tangle no
+#+begin_src python :noweb-ref imports :tangle no
   import pandas as pd
   import networkit as nk
 #+end_src
 
 #+header: :var datafile="c00421.parquet"
-#+begin_src jupyter-python
+#+begin_src python
   # Read data and keep just the url features.
   df = pd.read_parquet(datafile, engine="fastparquet")
   print(len(df))
@@ -43,7 +43,7 @@ We will only need the =url= and =links= columns to create our graph,
 so we drop every other column. We also only consider valid web
 responses with a status code between 200 and 299.
 
-#+begin_src jupyter-python
+#+begin_src python
   df = df[(df.status >= 200) & (df.status < 300)]
   df.drop([
       "id", "domain", "timestamp", "duration", "http_version", "status", "header", "type", "text"
@@ -58,12 +58,12 @@ To reduce the amount of data without losing too much insight, we will
 use just the domains including subdomains instead of the whole url and
 need to adjust the column accordingly. We do this with regex matching.
 
-#+begin_src jupyter-python :noweb-ref imports :tangle no
+#+begin_src python :noweb-ref imports :tangle no
   import json
   import re
 #+end_src
 
-#+begin_src jupyter-python
+#+begin_src python
   # Reduce urls to juts their domain and subdomain part.
   domain = re.compile(r'.*//([^/\?]*)(/|\?)?.*')
   get_domain = lambda x: domain.match(x).groups()[0]
@@ -94,11 +94,11 @@ will first sort the database index by the urls lexicographically,
 which will in turn enable us to find an index in logarithmic
 time. This requires [[https://numpy.org/][numpy]].
 
-#+begin_src jupyter-python :results none :noweb-ref imports :tangle no
+#+begin_src python :results none :noweb-ref imports :tangle no
   import numpy as np
 #+end_src
 
-#+begin_src jupyter-python :results none
+#+begin_src python :results none
   # Create unique sorted url index for fast lookups.
   df.sort_values("url", inplace=True)
   df.reset_index(inplace=True)
@@ -113,11 +113,11 @@ This happens by aggregating all our links from the same domain into one edge
 weight. Since this is also just a snapshot of our data all links that are not
 found in the index will be ignored.
 
-#+begin_src jupyter-python :noweb-ref imports :tangle no
+#+begin_src python :noweb-ref imports :tangle no
   from collections import Counter
 #+end_src
 
-#+begin_src jupyter-python
+#+begin_src python
   # Aggregate data points with the same url and create a corresponding weighted
   # edge in the graph.
   for i, url in enumerate(index):
@@ -148,7 +148,7 @@ A simple first thing to look at might be the strongly connected components of
 the graph. Since most sites link to themselves, we will only consider
 components of size greater than one.
 
-#+begin_src jupyter-python
+#+begin_src python
   SCC = nk.components.StronglyConnectedComponents(G)
   SCC.run()
   cs = [c for c in SCC.getComponents() if len(c) > 1]
@@ -333,210 +333,15 @@ components of size greater than one.
   Wall time: 20.4 ms
 #+end_example
 
-
 * COMMENT experimental
 
-#+begin_src jupyter-python
+#+begin_src python
   SCC = nk.components.StronglyConnectedComponents(G)
   SCC.run()
   cs = [c for c in SCC.getComponents() if len(c) > 1]
   for c in cs:
       print([index[i] for i in c])
 #+end_src
-
-#+RESULTS:
-#+begin_example
-  ['187um-killa-trill.tumblr.com', 'thesouthofheaven.tumblr.com']
-  ['projectnexium.wikidot.com', 'www.projectnexium-sandbox.wikidot.com']
-  ['bekk.no', 'www.bekk.no']
-  ['2021.ref.ac.uk', 'results2021.ref.ac.uk']
-  ['caddi.tech', 'recruit.caddi.tech']
-  ['2d20srd.opengamingnetwork.com', '4csrd.com', 'acksrd.opengamingnetwork.com', 'articles.opengamingnetwork.com', 'bfsrd.opengamingnetwork.com', 'cairnsrd.opengamingnetwork.com', 'everydaysrd.opengamingnetwork.com', 'fatecoresrd.opengamingnetwork.com', 'godsandmonsters.opengamingnetwork.com', 'grimwildsrd.opengamingnetwork.com', 'itu.opengamingnetwork.com', 'osesrd.opengamingnetwork.com', 'pf2.d20pfsrd.com', 'pf2orc.d20pfsrd.com', 'true20srd.opengamingnetwork.com', 'wrmsrd.opengamingnetwork.com', 'www.13thagesrd.com', 'www.35srd.com', 'www.5esrd.com', 'www.d20herosrd.com', 'www.dungeonworldsrd.com', 'www.starjammersrd.com', 'www.traveller-srd.com']
-  ['365slojd.se', 'hemslojdsguiden.se', 'www.365slojd.se']
-  ['ab.onliner.by', 'go.onliner.by', 'money.onliner.by', 'support.onliner.by', 'www.onliner.by']
-  ['abonnement.monitormedier.dk', 'naturmonitor.dk']
-  ['academy.nanocad.ru', 'braind.agency', 'forum.nanocad.ru', 'nanocad.ru', 'www.nanocad.ru']
-  ['academy.userinterviews.com', 'userinterviews.com']
-  ['microsoft-edge.en.uptodown.com', 'opera-browser.en.uptodown.com', 'opera.en.uptodown.com', 'supervpn-free-vpn-client.en.uptodown.com']
-  ['adblock-plus-for-android.en.uptodown.com', 'aloha-browser-turbo.en.uptodown.com', 'quark-browser.en.uptodown.com', 'total-adblock-for-samsung.en.uptodown.com']
-  ['ahead.iaps.inaf.it', 'webserver.javalab.ua.es', 'www.astro.unige.ch']
-  ['aholddelhaize.com', 'newsroom.aholddelhaize.com']
-  ['aikatsu-academy.com', 'www.aikatsu.net']
-  ['ajefo.ca', 'www.ajefo.ca']
-  ['proveg.com', 'veggiechallenge.de']
-  ['alfatv.pl', 'bip.zdit-koszalin.pl']
-  ['gryffindors.com', 'lectersgirl.altervista.org', 'thewildrose.org']
-  ['angelhotspot.neocities.org', 'dreamvalley.neocities.org']
-  ['angelzmindz.neocities.org', 'users2.smartgb.com']
-  ['bookstooge.wordpress.com', 'wordaholicanonymous.wordpress.com']
-  ['drunkenanimeblog.com', 'katthemovies.wordpress.com', 'mechanicalanimereviews.com', 'melinanimeland.wordpress.com', 'mibih.wordpress.com', 'thereviewheap.home.blog']
-  ['folk.lister24.no', 'www.lister24.no', 'www.polarismedia.no']
-  ['anoddreindeer.tumblr.com', 'shrikeseams.com']
-  ['antifascistnews.net', 'spencersunshine.com']
-  ['apaleo.com', 'apaleo.dev', 'identity.apaleo.com', 'status.apaleo.com']
-  ['api.client.notified.com', 'newsroom.kairosfuture.com']
-  ['aplaydatewithmyinnerchild.tumblr.com', 'cosmicgirlfriend.tumblr.com']
-  ['app.youform.com', 'help.youform.com']
-  ['ar.area9lyceum.com', 'area9lyceum.de', 'area9lyceum.it']
-  ['archcraft.io', 'wiki.archcraft.io']
-  ['homeothermic.tumblr.com', 'myshinyworld.tumblr.com']
-  ['arts.ca.gov', 'www.caculturaldistricts.org']
-  ['artsallianceva.org', 'vibecreativedistrict.org']
-  ['ary-podcast.uptodown.com', 'bookmate-books-and-audiobooks.uptodown.com']
-  ['rottiedollheart.neocities.org', 'www.ko-fi.com']
-  ['atari-frosch.de', 'blog.atari-frosch.de']
-  ['auctane.com', 'www.shipengine.com']
-  ['awritersrejections.tumblr.com', 'lostinhistory.tumblr.com', 'william-ontheinternet.tumblr.com']
-  ['axite.io', 'www.ax-semantics.com']
-  ['axlraimi.nekoweb.org', 'tohellwithit.nekoweb.org']
-  ['biomusterregionen-bw.de', 'www.bio-aus-bw.de']
-  ['beechresort-fleesensee.com', 'www.beechresort-boltenhagen.com']
-  ['beholdtheelder.bandcamp.com', 'kingbuffalo.bandcamp.com']
-  ['beverlypark.highlineschools.org', 'cascade.highlineschools.org', 'chinook.highlineschools.org', 'desmoines.highlineschools.org', 'glacier.highlineschools.org', 'gregory.highlineschools.org', 'hhs.highlineschools.org', 'innovationheights.highlineschools.org', 'jobs.highlineschools.org', 'madrona.highlineschools.org', 'mcmicken.highlineschools.org', 'mountview.highlineschools.org', 'northhill.highlineschools.org', 'pacific.highlineschools.org', 'parkside.highlineschools.org', 'staff.highlineschools.org', 'tyee.highlineschools.org', 'waskowitz.highlineschools.org']
-  ['birthproject.wordpress.com', 'ethnicallyincorrect.wordpress.com', 'kadnexus.wordpress.com', 'misplacedbaggage.wordpress.com', 'resistracism.wordpress.com', 'www.thelostdaughters.com']
-  ['blog.crystalyx.net', 'bluewave.fm', 'tsubakimono.camelia-studio.org']
-  ['blog.drdishbasketball.com', 'info.drdishbasketball.com', 'www.drdishbasketball.com']
-  ['blog.freelancersunion.org', 'freelancersunion.org']
-  ['blog.virginconnect.com', 'roam.virginconnect.com']
-  ['blyaaaaatman.wikidot.com', 'rosenberg-krupp-skoda-grumman.wikidot.com']
-  ['book.amishcountrylodging.com', 'www.amishcountrylodging.com']
-  ['brantsteele.com', 'brantsteele.org', 'survivor-org.wikia.com']
-  ['breakdownsbuttlights.tumblr.com', 'decepti-thots.tumblr.com']
-  ['calevbenyefuneh.blogspot.com', 'daphneanson.blogspot.com', 'geofffff.blogspot.com']
-  ['campus.quipper.com', 'www.quipper.com']
-  ['cancersyndrome.tumblr.com', 'eggsinthewind.tumblr.com']
-  ['capricornsims.tumblr.com', 'wi-fu.tumblr.com']
-  ['captain-suspenders.tumblr.com', 'wewillgo-onforever.tumblr.com']
-  ['catalogue.bulac.fr', 'www.efeo.fr']
-  ['certsign.ro', 'shop.certsign.ro']
-  ['charlieputh.fandom.com', 'louistomlinson.fandom.com']
-  ['margaretkilljoy.substack.com', 'poorprolesalmanac.substack.com']
-  ['christopherlbennett.wordpress.com', 'daybreakmagazine.wordpress.com']
-  ['cidic.tumblr.com', 'zebruh.tumblr.com']
-  ['climate-xchange.org', 'www.climatepolicydashboard.org']
-  ['clonehero.net', 'wiki.clonehero.net']
-  ['collision-ant.tumblr.com', 'talos-the-mourning-vessel.tumblr.com']
-  ['community.tetra4d.com', 'tetra4d.com']
-  ['ecovillage.org', 'learn.ecovillage.org', 'nextgen-ecovillage.org']
-  ['communityfinders.com', 'forum.ic.org', 'ic.org', 'icmatch.org']
-  ['conscienceandconsciousness.com', 'www.philipgoffphilosophy.com']
-  ['copyrightregistrationservice.com', 'intellectualpropertyrightsoffice.org']
-  ['corp.opro.net', 'event.opro.net', 'spc.opro.net', 'www.opro.net']
-  ['corumgroup.libsyn.com', 'www.corumgroup.com']
-  ['craigfernandez.tumblr.com', 'yungcrybby-anonymousbosch666.tumblr.com']
-  ['crazyneedles.pl', 'zaufaneo#+begin_src jupyter-python
-  SCC = nk.components.StronglyConnectedComponents(G)
-  SCC.run()
-  cs = [c for c in SCC.getComponents() if len(c) > 1]
-  for c in cs:pinie.smile.pl']
-  ['dana-chan-the-control-brain.tumblr.com', 'winston-ramone.tumblr.com']
-  ['datalend.com', 'orbisa.com', 'www.equilend.com']
-  ['de.prolewiki.org', 'el.prolewiki.org', 'en.prolewiki.org', 'es.prolewiki.org', 'fa.prolewiki.org', 'fr.prolewiki.org', 'pt.prolewiki.org', 'ru.prolewiki.org', 'zh.prolewiki.org']
-  ['dedf1shloveblog.tumblr.com', 'magicalgirlfia.tumblr.com', 'vampire-pierrot.tumblr.com']
-  ['www.isjd.pt', 'www.wheelt.pt']
-  ['dev.folio.org', 'docs.folio.org']
-  ['diningwithstrangers.com', 'joshcomix.wordpress.com']
-  ['docs.stackone.com', 'stackone.com', 'www.stackone.com']
-  ['dominateeye.tumblr.com', 'pauein.tumblr.com']
-  ['dyneue.tumblr.com', 'not-a-robot-i-swear.tumblr.com']
-  ['electronicgallery.tumblr.com', 'gallusdrawseverything.tumblr.com']
-  ['endowment.hse.ru', 'finance.hse.ru', 'icef.hse.ru', 'spasibo.hse.ru']
-  ['irradiation-facilities.web.cern.ch', 'radnext.web.cern.ch']
-  ['erigrid2.eu', 'www.rich2020.eu']
-  ['faq.noritz.co.jp', 'for-biz.noritz.co.jp', 'form.noritz.co.jp', 'mypage.noritz.co.jp', 'www.mainichigrillbu.com']
-  ['fiftyshadesofgreywiki.tumblr.com', 'thedietwiki.tumblr.com', 'thefashionwiki-blog.tumblr.com']
-  ['findyou.blogspot.com', 'ggpi.blogspot.com']
-  ['fireresearch.com', 'foampro.com']
-  ['fishzlgroup.ru', 'foodforfitness.ru']
-  ['flowersinbloomnothingtoaddteatime.wordpress.com', 'thebookwormdrinketh.com']
-  ['fpdcc.com', 'www.brookfieldzoo.org', 'www.czs.org']
-  ['gelatex.com', 'orders.gelatex.com']
-  ['german.languagedaily.com', 'russian.languagedaily.com']
-  ['gotamedia.se', 'www.gotamedia.se']
-  ['gotladies.tumblr.com', 'joanna-lannister.tumblr.com', 'merlinadementiasnow.tumblr.com']
-  ['heavenssexiestangel.tumblr.com', 'spnfanficpond.tumblr.com']
-  ['help.stamps.com', 'store.stamps.com']
-  ['ilmavoimat.fi', 'intti.fi', 'maanpuolustuskorkeakoulu.fi', 'merivoimat.fi', 'upseeriksi.fi']
-  ['industrial.seasonic.com', '#+begin_src jupyter-python
-  SCC = nk.components.StronglyConnectedComponents(G)
-  SCC.run()
-  cs = [c for c in SCC.getComponents() if len(c) > 1]
-  for c in cs:investor.seasonic.com']
-  ['inessential.com', 'nnw.ranchero.com']
-  ['iphodblog.blogspot.com', 'www.iphod.com']
-  ['is.rzeszow.pl', 'is.waw.pl']
-  ['itre.ncsu.edu', 'www.ncbussafety.org']
-  ['jadsa.bandcamp.com', 'jucaramarcal.bandcamp.com']
-  ['jantcu.com', 'plenti.co']
-  ['katalog.kerbl.com', 'www.covalliero.com']
-  ['keithbrooke.wordpress.com', 'tonyballantyne.com']
-  ['lilas22.exblog.jp', 'uluru115.exblog.jp']
-  ['loket.com', 'www.loket.com']
-  ['nemosquirrel.tumblr.com', 'spacialdimension.tumblr.com']
-  ['seaairra.tumblr.com', 'seethawithus.tumblr.com']
-  ['muskoxofficial.bandcamp.com', 'thurnin.bandcamp.com', 'ulvesang.bandcamp.com']
-  ['mandiminimojo.tumblr.com',#+begin_src jupyter-python
-  SCC = nk.components.StronglyConnectedComponents(G)
-  SCC.run()
-  cs = [c for c in SCC.getComponents() if len(c) > 1]
-  for c in cs: 'wondertrio.tumblr.com']
-  ['mandrakebrew.tumblr.com', 'omarandjohnny.tumblr.com']
-  ['md-bund.de', 'www.igel-monitor.de', 'www.medizinischerdienst.de']
-  ['mitt.iogt.se', 'norr.iogt.se', 'ost.iogt.se', 'pumpen.iogt.se', 'sydost.iogt.se']
-  ['museumstudiesabroad.org', 'popkult.org']
-  ['naoseidesenhar.substack.com', 'navisorbi.substack.com']
-  ['nat.org.uk', 'www.nat.org.uk']
-  ['niecodziennik.org', 'zapiskijoanny30.wordpress.com', 'zyciecelta.wordpress.com']
-  ['nyanbinaryrose.tumblr.com', 'teddyberr.tumblr.com']
-  ['oilcountryhq.com', 'oilersgamedaylive.com']
-  ['panpteryx.tumblr.com', 'wyrddogs.tumblr.com']
-  ['planetrdf.com', 'www.dajobe.org']
-  ['pointlinux.org', 'wiki.pointlinux.org']
-  ['ponvoryus.com', 'www.vandapharma.com']
-  ['shaeeldera.tumblr.com', 'skirris.tumblr.com']
-  ['rabbitroom.com', 'rabbitroom.substack.com', 'rabbitroommusic.substack.com', 'store.rabbitroom.com']
-  ['raven-2.de.uptodown.com', 'raven-2.uptodown.com']
-  ['safejournalists.net', 'www.hnd.hr']
-  ['scp-wiki-nos.wikidot.com', 'scpsandboxnos.wikidot.com']
-  ['ten-mou.tumblr.com', 'undercoverbrellla.tumblr.com', 'whimsipunk.tumblr.com']
-  ['store.onehope.net', 'www.onehope.net']
-  ['sundials.org', 'www.sundials.org']
-  ['support.stride.zone', 'www.stride.zone']
-  ['wiki.freshtomato.org', 'www.linksysinfo.org']
-  ['theluxuryeditor.com', 'www.fincalabobadilla.com', 'www.fincaserenamallorca.com', 'www.thelodgemallorca.com', 'www.theprincipalmadridhotel.com', 'www.unicohotels.com']
-  ['therex.ca', 'www.therex.ca', 'www.therexshop.ca']
-  ['thinkpad-forum.de', 'thinkwiki.de']
-  ['trustedtraders.which.co.uk', 'which.co.uk', 'whichwills.which.co.uk']
-  ['veganshop.gmbh', 'www.provegan.info', 'www.veganbook.info']
-  ['verbraucherportal-bw.de', 'www.ua-bw.de']
-  ['webpub2.igae.hacienda.gob.es', 'www.oficinavirtual.pap.hacienda.gob.es']
-  ['webshop.provendo.no', 'www.provendo.no']
-  ['wiki.iots.vip', 'www.iots.vip']
-  ['wiki.recalbox.com', 'www.recalbox.com']
-  ['www.010316.com.cn', 'www.023-tl.cn', 'www.0411autos.cn', 'www.0580u.cn', 'www.0592178.cn', 'www.0816jcw.cn', 'www.0991led.cn', 'www.100gps.com.cn', 'www.100lang.cn', 'www.100msm.cn', 'www.11d15c.cn', 'www.1236321.cn', 'www.12sgzjt.cn', 'www.15977.cn', 'www.163edu.com.cn', 'www.17592.cn', 'www.17tb8.cn', 'www.17thjsgames.org.cn', 'www.1d1l.org.cn', 'www.2020777.cn', 'www.202078.cn', 'www.21dmedia.net.cn', 'www.21it.com.cn', 'www.2222110.cn', 'www.234zhe.cn', 'www.25427187.cn', 'www.26333.cn', 'www.28sj.net.cn', 'www.2cha.cn', 'www.339966.com.cn', 'www.360qvod.cn', 'www.3n168.cn', 'www.3wsj.cn', 'www.3xwd.cn', 'www.414313.com.cn', 'www.47177.cn', 'www.4kuu.cn', 'www.51777888.cn', 'www.51jiankang.com.cn', 'www.51kafu.cn', 'www.51sd.com.cn', 'www.520wenda.cn', 'www.52dgou.cn', 'www.52yjm.cn', 'www.55sssf.cn', 'www.56710.cn', 'www.5777777.cn', 'www.591ey.cn', 'www.5udns.cn', 'www.5wsh.cn', 'www.666cp.cn', 'www.66kg.cn', 'www.67303.com.cn', 'www.6781.com.cn', 'www.6825.org.cn', 'www.6d3.com.cn', 'www.6m.org.cn', 'www.70847.cn', 'www.777ht.cn', 'www.77gou.com.cn', 'www.789mmm.cn', 'www.80anmo.cn', 'www.810086.com.cn', 'www.82691.cn', 'www.85012.cn', 'www.87ge.cn', 'www.88131420.cn', 'www.884444.com.cn', 'www.88miaomu.cn', 'www.8xiu.com.cn', 'www.91hubei.cn', 'www.abccompanies.com.cn', 'www.ac163.com.cn', 'www.acseo.cn', 'www.actword.cn', 'www.acutec.cn', 'www.adenstar.com.cn', 'www.advtekgroup.com.cn', 'www.ahxhzy.cn', 'www.akqe.cn', 'www.alib.com.cn', 'www.alnmpci.cn', 'www.ampte.com.cn', 'www.anandishanghai.cn', 'www.andeli88.com.cn', 'www.aojuan.cn', 'www.aolida-ic.cn', 'www.apearl.cn', 'www.aqst.com.cn', 'www.arkmid.cn', 'www.art360.com.cn', 'www.arthroscopy.cn', 'www.asiafriender.cn', 'www.avast1.cn', 'www.avonair.com.cn', 'www.bakeyuansu.cn', 'www.ballaz.cn', 'www.bandao111.cn', 'www.baoshengtai.cn', 'www.bb5y.com.cn', 'www.bczh.com.cn', 'www.bdshyy.cn', 'www.beifengshan.com.cn', 'www.bignature.com.cn', 'www.bistone.cn', 'www.bjdxh.com.cn', 'www.bjelc.com.cn', 'www.bjhkkj.cn', 'www.bjhyyf.cn', 'www.bjtongyao.com.cn', 'www.bjyzmd.cn', 'www.blogkid.cn', 'www.bmg88.cn', 'www.bodakj.com.cn', 'www.bopie.com.cn', 'www.bsd88.cn', 'www.c-art.cn', 'www.c116.cn', 'www.cafebabe.cn', 'www.caihongqiao.org.cn', 'www.carjapan.com.cn', 'www.cbdc1.cn', 'www.cby138.cn', 'www.cchengtai.cn', 'www.ccyyi.cn', 'www.cddkfw.cn', 'www.cdsafety.com.cn', 'www.cdwll.cn', 'www.cfuclub.cn', 'www.cheeloosoft.com.cn', 'www.chemgoo.cn', 'www.chengdawenzhou.cn', 'www.chest.org.cn', 'www.chidexiao.cn', 'www.chikee.com.cn', 'www.chongqingbidan.cn', 'www.chstar.cn', 'www.chu-ming.com.cn', 'www.cifexpo.com.cn', 'www.cilaya.cn', 'www.cjwu.cn', 'www.ckje.cn', 'www.cncns.cn', 'www.cncye.cn', 'www.cnkawayi.cn', 'www.cnlebao.cn', 'www.cnzkd.cn', 'www.co998.cn', 'www.colincctv.com.cn', 'www.comef51.cn', 'www.cqgyp.cn', 'www.cqsqfy.com.cn', 'www.cqwhmy.cn', 'www.cqxyg.com.cn', 'www.cqycc.org.cn', 'www.crep-led.cn', 'www.csspring.cn', 'www.ctscloud.cn', 'www.cuanet.org.cn', 'www.cxbook.com.cn', 'www.cz-xd.cn', 'www.czaxmy.cn', 'www.czcmjk.com.cn', 'www.czqahb.cn', 'www.cztengguan.cn', 'www.d1dy.cn', 'www.dajiawang.com.cn', 'www.dalianwk.cn', 'www.danif.cn', 'www.dansuan88.cn', 'www.daqiall.cn', 'www.dbyf.com.cn', 'www.ddxs.org.cn', 'www.dediu.cn', 'www.dfcjw.cn', 'www.dgeye.com.cn', 'www.dggaoda.cn', 'www.dghyfirm.cn', 'www.dgssjj.cn', 'www.dgxingao.com.cn', 'www.dicvideo.com.cn', 'www.dingleidoors.cn', 'www.dnsbw.com.cn', 'www.dosome.com.cn', 'www.downloading.com.cn', 'www.dr58.cn', 'www.drglass.cn', 'www.dseoul.cn', 'www.dsp-sz.cn', 'www.dtrclub.cn', 'www.dukemen.cn', 'www.dxt-data.cn', 'www.dy368.cn', 'www.dzzhjhsb.cn', 'www.e-youbao.cn', 'www.easyrecovery.com.cn', 'www.ecou.cn', 'www.edlk.cn', 'www.edrc.com.cn', 'www.egc.net.cn', 'www.egozone.cn', 'www.eguluomin.cn', 'www.eilv.com.cn', 'www.eliang.com.cn', 'www.enerbos.cn', 'www.enfi-yq.com.cn', 'www.engpv.com.cn', 'www.eoaoo.com.cn', 'www.eoopoo.com.cn', 'www.epioo.cn', 'www.eroda.net.cn', 'www.estsc.cn', 'www.faironline.com.cn', 'www.fanchaoo.cn', 'www.fayao.com.cn', 'www.fcnysbc.cn', 'www.feifan360.cn', 'www.feikedaili.cn', 'www.fenghuatea.cn', 'www.fengnaier.cn', 'www.feplc.cn', 'www.fgfkj.cn', 'www.firstar.net.cn', 'www.fjnh.com.cn', 'www.foammachine.cn', 'www.frontid.com.cn', 'www.fs-huamei.com.cn', 'www.fs-robot.cn', 'www.fshsdq.com.cn', 'www.fssdsh.cn', 'www.fstianyou.cn', 'www.fuliao.org.cn', 'www.funsan.cn', 'www.fuxx.cn', 'www.fuyisi.cn', 'www.fwt-a.cn', 'www.fzlexus.com.cn', 'www.gangsiwowo.cn', 'www.gaoxueya5.com.cn', 'www.gch.net.cn', 'www.gdwdy.cn', 'www.gefitinib.com.cn', 'www.geleite.cn', 'www.gfs8580.cn', 'www.ggitech.com.cn', 'www.ggj.net.cn', 'www.ggnkyy.cn', 'www.gicommittee.com.cn', 'www.gjjr.com.cn', 'www.gold0559.cn', 'www.gongfuyu.com.cn', 'www.good-pay.cn', 'www.gq365.cn', 'www.greenshow.cn', 'www.gszbz.com.cn', 'www.gt88.cn', 'www.guangfatent.cn', 'www.guanghuahuashi.cn', 'www.guojinvzhuangpifa.net.cn', 'www.guomao85.cn', 'www.guowei-pbx.com.cn', 'www.guoyuanwai.cn', 'www.gwcb.com.cn', 'www.gxsmjbi.cn', 'www.gyfudiao.cn', 'www.gz-sjkj.com.cn', 'www.gz8u8.cn', 'www.gzbhhd.cn', 'www.gzhlkj.cn', 'www.gzjieke.cn', 'www.gzjinrun.cn', 'www.gzjyb.com.cn', 'www.gzkjjs.cn', 'www.gzluodan.cn', 'www.gzsckw.cn', 'www.gzzj020.cn', 'www.haiandasha.cn', 'www.haizhifeng.cn', 'www.hansudj.cn', 'www.hanting114.cn', 'www.hanxueshop.cn', 'www.haojb.cn', 'www.hawkinfo.com.cn', 'www.hdqshy.cn', 'www.healthyst.com.cn', 'www.hemaie.cn', 'www.hezudao52.cn', 'www.hf-tech.cn', 'www.hfzxlw.cn', 'www.hgj.org.cn', 'www.hgldt.cn', 'www.hhjie.cn', 'www.hi-tone.cn', 'www.hi0543.cn', 'www.hifi5.com.cn', 'www.hiltondalian.cn', 'www.hitecmen.com.cn', 'www.hjgz18.cn', 'www.hlzhizao.cn', 'www.hmbiz.cn', 'www.hn88.cn', 'www.hnhzxtd.cn', 'www.hnslhzx.cn', 'www.hnydw.cn', 'www.hnyzssy.cn', 'www.hnzbdb.cn', 'www.hoboob.cn', 'www.hongtong168.cn', 'www.huaan168.com.cn', 'www.huagaoxi.cn', 'www.huaisutang.cn', 'www.huanghaiwang.com.cn', 'www.huangxibo.cn', 'www.huashuoel.cn', 'www.huidali.cn', 'www.hxbox.com.cn', 'www.hy663.cn', 'www.hydpf.org.cn', 'www.hytaxedu.cn', 'www.hzlsnz.cn', 'www.hztuoyu.cn', 'www.i-europe.cn', 'www.ia8848.cn', 'www.ibmcenter.com.cn', 'www.icclaw.com.cn', 'www.idc5588.cn', 'www.ie-baidu.cn', 'www.ih4.com.cn', 'www.ihongtu.cn', 'www.ikbpt.cn', 'www.ilebao.cn', 'www.im-ligang.cn', 'www.inonline.cn', 'www.interwest.com.cn', 'www.ionizedwater.cn', 'www.itku.com.cn', 'www.itwyw.cn', 'www.iweihai.com.cn', 'www.j-wanc.com.cn', 'www.jasminetea1.cn', 'www.javadown.com.cn', 'www.jbbabycare.cn', 'www.jbs-engines.com.cn', 'www.jf-net.com.cn', 'www.jfyfzgs.com.cn', 'www.jiahecaifu.cn', 'www.jiamengso.cn', 'www.jiayixuan.cn', 'www.jinboyifang.cn', 'www.jinfeng-sh.com.cn', 'www.jingmeiren.cn', 'www.jingyinxiang.cn', 'www.jinhuowang.com.cn', 'www.jinnianlun.cn', 'www.jipinhong.cn', 'www.jixif.cn', 'www.jlhuoyun.cn', 'www.jlxty.cn', 'www.jmsjp.com.cn', 'www.jndpf.org.cn', 'www.jnksq.cn', 'www.job5191.cn', 'www.jobss.com.cn', 'www.joryl.cn', 'www.jpcabal.cn', 'www.jsbcf.cn', 'www.jsbyzj.cn', 'www.jsfsx.com.cn', 'www.jshbkjgs.cn', 'www.jshiggs.cn', 'www.jsnw.com.cn', 'www.jssjgxxw.cn', 'www.jsywl.cn', 'www.juhuibao.com.cn', 'www.julinfloor.cn', 'www.jupaio.com.cn', 'www.jxchangrong168.cn', 'www.jyjyj.cn', 'www.k345.cn', 'www.kaikenuo.cn', 'www.kaitedj.cn', 'www.kaizhou-edu.cn', 'www.kancept.cn', 'www.kedele.cn', 'www.keidang.com.cn', 'www.kelinsi.cn', 'www.kellymoss.com.cn', 'www.keyu.net.cn', 'www.kfkeji.cn', 'www.khanate.cn', 'www.kijkbxw.cn', 'www.kindak.cn', 'www.komba.cn', 'www.konjacgum.com.cn', 'www.kpdsxw.cn', 'www.kq86.cn', 'www.kuangshan.net.cn', 'www.kucap.cn', 'www.ladj.com.cn', 'www.lareboss.cn', 'www.lc95.cn', 'www.lcpipe.cn', 'www.lcqsn.org.cn', 'www.lelaso.com.cn', 'www.lemonhotel.cn', 'www.lfjj8.cn', 'www.lilangjx.cn', 'www.llmc8.cn', 'www.lnch.com.cn', 'www.lounue.cn', 'www.lovelymama.cn', 'www.loves22.cn', 'www.lovoshop.cn', 'www.lqcmmc.cn', 'www.lqm889.cn', 'www.lqrgj.cn', 'www.lrogen.cn', 'www.ltic.com.cn', 'www.luhongsuye.cn', 'www.luxrose.cn', 'www.luyjpa.cn', 'www.lvzejun.cn', 'www.ly519.cn', 'www.lycdsy.cn', 'www.lygcec.cn', 'www.lyjbt.cn', 'www.lyswdx.cn', 'www.lzhwzl.cn', 'www.m216.cn', 'www.madier.com.cn', 'www.maincom.com.cn', 'www.makesoft.com.cn', 'www.maltaese.com.cn', 'www.manong.net.cn', 'www.maxigo.com.cn', 'www.mcjmxx.cn', 'www.megsine.cn', 'www.meidabz.cn', 'www.meishujiameng.cn', 'www.meizhiquan.cn', 'www.merrykey.cn', 'www.metalz.com.cn', 'www.mfrank.cn', 'www.miaomiaobei.cn', 'www.midea020.com.cn', 'www.mikebag.com.cn', 'www.milan-station.cn', 'www.mingsheshangxuan.cn', 'www.mishu99.cn', 'www.mmbuy.cn', 'www.mmyj.com.cn', 'www.mnjxc.cn', 'www.moershen.com.cn', 'www.mold-industry.cn', 'www.mortisingmachine.com.cn', 'www.muxika.com.cn', 'www.myhousecare.com.cn', 'www.mytalents.com.cn', 'www.nanlace.com.cn', 'www.nbbus.com.cn', 'www.nbhwwh.cn', 'www.nblkq02.cn', 'www.nbmagnet.cn', 'www.nc365.cn', 'www.nethn.cn', 'www.neunited.cn', 'www.new-new.cn', 'www.nicepar.cn', 'www.nj-sy.cn', 'www.njrgw.cn', 'www.njspx.com.cn', 'www.nju-edu.cn', 'www.njwdkj.cn', 'www.nnls.net.cn', 'www.nongyeshebei.cn', 'www.nooaoo.cn', 'www.nphjw.cn', 'www.nxlhwhysp.cn', 'www.nyhtt.cn', 'www.oneting.cn', 'www.ootfirz.cn', 'www.osdeng.cn', 'www.osxg.com.cn', 'www.palak.cn', 'www.pan-art.cn', 'www.pandababy.com.cn', 'www.panx.com.cn', 'www.papiorecycle.cn', 'www.parkal.com.cn', 'www.pieda.cn', 'www.pingdinglian.cn', 'www.pkups.com.cn', 'www.pl-pefilm.cn', 'www.pop-mm.cn', 'www.princeofpeace.cn', 'www.proteusfitness.cn', 'www.protex.net.cn', 'www.pstry.cn', 'www.ptan.cn', 'www.ptzzb.cn', 'www.pubad.com.cn', 'www.pushite.cn', 'www.pytyjy.net.cn', 'www.qcxmk.cn', 'www.qdone.cn', 'www.qdsptgm.cn', 'www.qdxintai.cn', 'www.qianbanjiage.cn', 'www.qifugu.com.cn', 'www.qingyanghualv.com.cn', 'www.qiyongdong.cn', 'www.qjba.cn', 'www.qlif.cn', 'www.qm139.com.cn', 'www.qnfty.cn', 'www.qs-zm.cn', 'www.qutaobao.cn', 'www.qxjh.cn', 'www.qyxbw.cn', 'www.qzjiuhua.com.cn', 'www.rdsptech.cn', 'www.redbaobao.cn', 'www.ree.net.cn', 'www.rockins.cn', 'www.romond.cn', 'www.ruanzhoubeng.cn', 'www.ruicaotang.cn', 'www.ruidisen.cn', 'www.russiaguoxin.cn', 'www.salira.com.cn', 'www.sanhehg.cn', 'www.sbytech.cn', 'www.scqsq.cn', 'www.sdevent.cn', 'www.sdhry.com.cn', 'www.sdicl.com.cn', 'www.sdlove.com.cn', 'www.sdyingyue.cn', 'www.senliao.com.cn', 'www.seotop1.cn', 'www.sfj1236.com.cn', 'www.sglsw.com.cn', 'www.sh-wood.com.cn', 'www.shautoexpo.org.cn', 'www.shbashiwl.cn', 'www.shchenwang.com.cn', 'www.shengjiemoye.cn', 'www.shengxingabion.cn', 'www.shhc.org.cn', 'www.shhqw.com.cn', 'www.shhydl.cn', 'www.shiningblue.cn', 'www.shoueryouyang.cn', 'www.shrailway.com.cn', 'www.shsose.com.cn', 'www.shtkrkq.cn', 'www.shubiao.net.cn', 'www.shuhuazhi.cn', 'www.shunhead.cn', 'www.shzhiying.cn', 'www.shzkb.cn', 'www.sjksgs.cn', 'www.sjmhg.com.cn', 'www.sjmyjd.cn', 'www.sjmz.com.cn', 'www.sjtvip.cn', 'www.sk010.cn', 'www.skmtech.cn', 'www.slrfl.cn', 'www.smartaudit.com.cn', 'www.sn999.cn', 'www.snmen.cn', 'www.snweifeng.cn', 'www.songyouhui.cn', 'www.sosolala.com.cn', 'www.space-time.com.cn', 'www.spfbw.cn', 'www.sq148.com.cn', 'www.srfengguanji.cn', 'www.sscar.com.cn', 'www.stadytime.cn', 'www.staei.cn', 'www.stageline.cn', 'www.stamp99.cn', 'www.steel-grating.cn', 'www.stock6678.cn', 'www.stopthatsnoring.com.cn', 'www.suisuipingan.com.cn', 'www.sunhaiwei.cn', 'www.sunnybay.com.cn', 'www.sustid.cn', 'www.suval.com.cn', 'www.sxoffice.com.cn', 'www.sxtdybio.cn', 'www.sxxrbz.cn', 'www.sycste.org.cn', 'www.sygydxxb.cn', 'www.syxscy.cn', 'www.sz-zhw.cn', 'www.sz2783.cn', 'www.szbgs.com.cn', 'www.szhuanair.com.cn', 'www.szjinyu.cn', 'www.szjy88.cn', 'www.szmt56.cn', 'www.szpsf.cn', 'www.szqctsy.cn', 'www.szqxwq.cn', 'www.szryxgd.com.cn', 'www.szxaoa.cn', 'www.t44867k.cn', 'www.tchjd.cn', 'www.test99.com.cn', 'www.thepaper.net.cn', 'www.thjdsb.cn', 'www.thkzxxx.cn', 'www.tianlaicun.cn', 'www.tianyugg.cn', 'www.timings.cn', 'www.tit.net.cn', 'www.tj800.cn', 'www.tjnhsafety.cn', 'www.tjsszw.cn', 'www.tkdc.com.cn', 'www.tld.net.cn', 'www.tlfrk.cn', 'www.tlxuba.cn', 'www.tongchuntang.com.cn', 'www.tongfasolar.cn', 'www.tongjijujia.cn', 'www.tooren.cn', 'www.topvista.cn', 'www.tradevv.cn', 'www.traditionalmedicine.com.cn', 'www.trafficabc.cn', 'www.tsyimin.cn', 'www.ttmmuyegs.cn', 'www.ttua.cn', 'www.tusafe.cn', 'www.txhy-audio.com.cn', 'www.txty.com.cn', 'www.txyp185.cn', 'www.ty39.cn', 'www.tz10000.cn', 'www.uepu.cn', 'www.uhn98.cn', 'www.uiut.cn', 'www.ujnr.cn', 'www.ukonline.com.cn', 'www.unicome.cn', 'www.uqen.cn', 'www.utosee.cn', 'www.uwds.cn', 'www.v3d.com.cn', 'www.vastchip.com.cn', 'www.vastorient.com.cn', 'www.vic365.cn', 'www.vnrg.cn', 'www.vr163.com.cn', 'www.vsg-ad.cn', 'www.w-qq.cn', 'www.wabaowang.com.cn', 'www.wailianwang.com.cn', 'www.wangkuandian.cn', 'www.wangqicai.cn', 'www.wangyameit.cn', 'www.wangyongtuox.com.cn', 'www.wblshbx.cn', 'www.wdqkx.org.cn', 'www.webaiye.cn', 'www.webtrend.cn', 'www.weizailink.cn', 'www.weizhijiaoyu.cn', 'www.werc.cn', 'www.westinvest.net.cn', 'www.westyy.cn', 'www.wfjdjx.cn', 'www.whatisultimate.cn', 'www.wheelstar.com.cn', 'www.whrsrc.cn', 'www.wklmy.com.cn', 'www.wm520.com.cn', 'www.wmoeck.cn', 'www.wnbe.cn', 'www.wo4000.com.cn', 'www.wode373.cn', 'www.wonf.cn', 'www.world-famous.com.cn', 'www.worldgift.com.cn', 'www.woyemaicha.com.cn', 'www.wroz.cn', 'www.wucaige.cn', 'www.wxaw.org.cn', 'www.wyx007.cn', 'www.wz2.com.cn', 'www.xa77.cn', 'www.xalove.com.cn', 'www.xamj.net.cn', 'www.xamqy.org.cn', 'www.xaws.com.cn', 'www.xcgm.com.cn', 'www.xf701218.cn', 'www.xguv.com.cn', 'www.xiangyangyuju.cn', 'www.xianzengjia.cn', 'www.xiaoflash.cn', 'www.xiaomoo.cn', 'www.xiebao361.cn', 'www.xindth.cn', 'www.xingfuyingyuan.com.cn', 'www.xinhongbo.cn', 'www.xinhuajinrong.cn', 'www.xinjiamei.com.cn', 'www.xinmedia.cn', 'www.xinqianyou.cn', 'www.xintai668.cn', 'www.xinyuanshun.cn', 'www.xlfly.com.cn', 'www.xrcorp.com.cn', 'www.xsz123.com.cn', 'www.xt2.com.cn', 'www.xuancuiju.com.cn', 'www.xyditan.com.cn', 'www.xytmc.com.cn', 'www.xzcl.org.cn', 'www.xzxxz.cn', 'www.yaozhaoshang.com.cn', 'www.ybhuntun.cn', 'www.ybzh.com.cn', 'www.ycflxx.com.cn', 'www.yczp5.cn', 'www.ydczns.com.cn', 'www.yesv.com.cn', 'www.yfdianxiaoka.cn', 'www.yhhenglish.cn', 'www.yi-sheng.cn', 'www.yida365.com.cn', 'www.yiment.cn', 'www.yingjia01.cn', 'www.yinhedl.cn', 'www.yiyizuche.cn', 'www.ykbm.com.cn', 'www.ykgg.com.cn', 'www.yls188.cn', 'www.yluxuepian.cn', 'www.ynjlms.cn', 'www.ynrnm.cn', 'www.ynsfwh.cn', 'www.ynttt.com.cn', 'www.yohotalk.cn', 'www.yongshengjx.cn', 'www.youfamily.net.cn', 'www.youh.net.cn', 'www.youngel.cn', 'www.ysxjkjd.cn', 'www.ytjl168.cn', 'www.ytsmc.com.cn', 'www.yuansheying.com.cn', 'www.yufdc.cn', 'www.yumovip.cn', 'www.yuxibolt.cn', 'www.yuxiqing.cn', 'www.yuyuanxiang.cn', 'www.yxsite.com.cn', 'www.yzjly.cn', 'www.yzsfdc.cn', 'www.yzxx188.com.cn', 'www.zbshebao.cn', 'www.zbsugang.com.cn', 'www.zdbmw.cn', 'www.zdmapsj.cn', 'www.zengbincc.cn', 'www.zfmj.com.cn', 'www.zggxiqy.cn', 'www.zgmmby.cn', 'www.zgpaz.cn', 'www.zgtaixu.cn', 'www.zgyxscw.com.cn', 'www.zhanglangkexing.cn', 'www.zhanjiangwuliu.cn', 'www.zhaoji.net.cn', 'www.zhengloulipin.cn', 'www.zhilengqi.com.cn', 'www.zhilijiaren.cn', 'www.zhnyw.cn', 'www.zhongjian.net.cn', 'www.zhongtai.net.cn', 'www.zhongwone.cn', 'www.zhspw.com.cn', 'www.zhutanq.cn', 'www.zhwdw.cn', 'www.zj-one.cn', 'www.zj-zzhb.cn', 'www.zjbldlt.cn', 'www.zkeea.cn', 'www.zlhx.com.cn', 'www.zndxr.cn', 'www.zouzha.cn', 'www.zrimp.cn', 'www.zs-weike.cn', 'www.zshnet.cn', 'www.zshx88.com.cn', 'www.zsoa.com.cn', 'www.zt007.cn', 'www.zt386.cn', 'www.zuoyuedoor.cn', 'www.zwwzdq.cn', 'www.zyzjq.com.cn', 'www.zz-dns.cn', 'www.zz001.com.cn', 'www.zzwy.com.cn']
-  ['www.1789restaurant.com', 'www.clydesgroup.com', 'www.cordeliadc.com', 'www.ebbitt.com', 'www.ryestreettavern.com', 'www.tombs.com']
-  ['www.anacostiaboathouse.org', 'www.capitalrowing.org']
-  ['www.bakersdaughterdc.com', 'www.giftrocker.com', 'www.gravitasdc.com', 'www.michelesdc.com']
-  ['www.bgsaxo.it', 'www.help.saxo']
-  ['www.cms.zju.edu.cn', 'yau-contest.com']
-  ['www.facing-online.com', 'www.fujisash-grp-netshop.jp', 'www.fujisash.co.jp']
-  ['www.fackelmann.com', 'www.f#+begin_src jupyter-python
-  SCC = nk.components.StronglyConnectedComponents(G)
-  SCC.run()
-  cs = [c for c in SCC.getComponents() if len(c) > 1]
-  for c in cs:ackelmann.de']
-  ['www.ferdi-fuchs.de', 'www.heristo.de', 'www.meat2000.de', 'www.servit.de', 'www.stockmeyer.de', 'www.youcook-food.com']
-  ['www.formations-hbjo.com', 'www.franceclat.fr', 'www.montresalafrancaise.fr']
-  ['www.greblon.com', 'www.kansai-helios.eu']
-  ['www.linuxexpres.cz', 'www.openoffice.cz']
-  ['www.nevadacitychamber.com', 'www.nevadacountyarts.org']
-  ['www.odkmedia.net', 'www.ondemandkorea.com']
-  ['www.paderno.it', 'www.rosenthal.de']
-  ['www.wordfast.com', 'www.wordfast.net']
-  CPU times: user 23.1 ms, sys: 15.8 ms, total: 38.9 ms
-  Wall time: 45.1 ms
-#+end_example
-
 
 # Local Variables:
 # eval: (add-hook 'org-babel-tangle-body-hook (lambda nil (beginning-of-buffer) (replace-string "%%time" "")))
