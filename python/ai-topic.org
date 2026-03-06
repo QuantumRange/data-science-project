@@ -1,3 +1,4 @@
+#+property: header-args:jupyter-python :session *jupyter* :eval no-export :async yes :tangle gen_graph.py :prologue "%%time" :exports both
 #+property: header-args :exports both
 
 * Handpicked List of AI buzzwords
@@ -6,30 +7,30 @@ List of words that indicate a site is talking about AI or more
 specifically LLMs.
 
 #+name: ai-buzzwords
-| Buzzword                | Weight |
-|-------------------------+--------|
-| AI                      |    1.0 |
-| artificial intelligence |    1.0 |
-| LLM                     |    1.0 |
-| large language model    |    1.0 |
-| model                   |    0.3 |
-| GPT                     |    1.0 |
-| ChatGPT                 |    1.0 |
-| OpenAI                  |    0.9 |
-| Ollama                  |    1.0 |
-| Gemini                  |    0.8 |
-| Copilot                 |    1.0 |
-| Perplexity              |    0.3 |
-| Claude                  |    1.0 |
-| Integration             |    0.3 |
-| powerful                |    0.1 |
-| token                   |    0.2 |
-| productivity            |    0.1 |
-| deploy                  |    0.1 |
-| performance             |    0.1 |
-| boost                   |    0.1 |
-| agent                   |   0.75 |
-| agentic                 |   0.75 |
+| Buzzword     | Weight |
+|--------------+--------|
+| ai           |    1.0 |
+| artificial   |    0.2 |
+| intelligence |    0.1 |
+| llm          |    1.0 |
+| language     |    0.1 |
+| model        |    0.3 |
+| gpt          |    1.0 |
+| chatgpt      |    1.0 |
+| openai       |    0.9 |
+| ollama       |    1.0 |
+| gemini       |    0.8 |
+| copilot      |    1.0 |
+| perplexity   |    0.3 |
+| claude       |    1.0 |
+| integrate    |    0.3 |
+| powerful     |    0.1 |
+| token        |    0.2 |
+| productivity |    0.1 |
+| deploy       |    0.1 |
+| performance  |    0.1 |
+| boost        |    0.1 |
+| agent        |   0.75 |
 
 #+begin_src hy :var words=ai-buzzwords :results output file :file "ai-buzzwords.csv"
   (for [[b w] words]
@@ -179,3 +180,79 @@ And some self searched sites
 
 #+RESULTS:
 [[file:ai-topic-sites-list.txt]]
+
+* AI Topic database
+
+#+header: :var bw=ai-buzzwords
+#+begin_src jupyter-python :results none
+  import polars as pl
+  df = ps.read_csv("ai-topic-site-words.csv")
+#+end_src
+
+#+header: :var datafile="../../chunks/c00421.parquet"
+#+begin_src jupyter-python
+  df2 = pd.read_parquet(datafile, engine="fastparquet")
+#+end_src
+
+#+RESULTS:
+: CPU times: user 4.83 s, sys: 207 ms, total: 5.04 s
+: Wall time: 5.04 s
+
+#+header: :var bw=ai-buzzwords
+#+begin_src jupyter-python :results none
+  bw = dict(bw)
+  def score(text):
+    # words = text.split()
+    words = set(text.split())
+    score = 0
+    for w in words:
+        if w in bw:
+            score += bw[w]
+    return score
+#+end_src
+
+#+begin_src jupyter-python
+  import numpy as np
+  pos_scores = np.zeros((len(df),))
+  neg_scores = np.zeros((len(df2),))
+  for i, t in enumerate(df['text']):
+      pos_scores[i] = score(t)
+      
+  for i, t in enumerate(df2['text']):
+      neg_scores[i] = score(t)
+
+  print(pos_scores.mean(), pos_scores.min(), pos_scores.max(), np.median(pos_scores))
+  print(neg_scores.mean(), neg_scores.min(), neg_scores.max(), np.median(neg_scores))
+#+end_src
+
+#+RESULTS:
+: 4.118072289156626 1.1 7.75 4.15
+: 0.03116014106157881 0.0 6.7 0.0
+: CPU times: user 14.7 s, sys: 7.83 ms, total: 14.7 s
+: Wall time: 14.7 s
+
+#+begin_src jupyter-python
+    import matplotlib.pyplot as plt
+    def tp(th):
+        a = pos_scores >= th
+        return a.sum() / len(a)
+    def fp(th):
+        a = neg_scores >= th
+        return a.sum() / len(a)
+
+    points = np.array([
+        [fp(th), tp(th)]
+        for th in np.linspace(0, pos_scores.max(), 100)
+    ])
+    plt.scatter(points[:,0], points[:,1])
+    plt.xlabel("false positive rate")
+    plt.ylabel("true positive rate")
+#+end_src
+
+#+RESULTS:
+:RESULTS:
+: CPU times: user 18.2 ms, sys: 2.97 ms, total: 21.1 ms
+: Wall time: 18.3 ms
+: Text(0, 0.5, 'true positive rate')
+[[file:./.ob-jupyter/322320a5ef3848a51fff5ce67c264f4379b564e7.png]]
+:END:
