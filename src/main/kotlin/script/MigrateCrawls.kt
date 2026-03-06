@@ -21,7 +21,7 @@ fun main(): Unit = runMain {
 
     val pipelineJob = launch {
 //        CompressorTransformer.apply(SourceStorage, CompressedStorage)
-//        IdInjectorTransformer.apply(CompressedStorage, IdInjectedStorage)
+        IdInjectorTransformer.apply(CompressedStorage, IdInjectedStorage)
 //        TextTransformer.apply(IdInjectedStorage, TextStorage)
         LinkProcessingTransformer.apply(TextStorage, LinkStorage)
     }
