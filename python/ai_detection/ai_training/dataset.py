@@ -10,9 +10,8 @@ class ShardDataset(Dataset):
         self.embeddings = embeddings
         self.labels = labels
 
-
 def load_shard(name: str) -> tuple[torch.Tensor, torch.Tensor]:
     embeddings = np.load(SHARD_DIR / f"{name}.emb.npy")
     label = np.load(SHARD_DIR / f"{name}.lbl.npy")
 
-    return torch.tensor(embeddings).pin_memory(), torch.tensor(label).pin_memory()
+    return torch.tensor(embeddings).pin_memory(), torch.tensor(label, dtype=torch.long).pin_memory()

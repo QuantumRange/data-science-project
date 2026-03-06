@@ -6,7 +6,7 @@ import java.io.File
 
 object SourceStorage : PipelineStorage {
     
-    override val directory: File = File("/home/quantumrange/data/crawls/")
+    override val directory: File = File("/mnt/data-dump/crawls/")
     override val isWrite: Boolean = false
 
     override suspend fun allocate(name: String): FileHolder = FileHolder(
