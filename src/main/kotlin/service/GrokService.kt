@@ -55,7 +55,7 @@ object GrokService {
                         return@async
                     }
 
-                    val response = semaphore.withPermit {runCatching {  client.get(url) }.getOrNull() }
+                    val response = semaphore.withPermit { runCatching { client.get(url) }.getOrNull() }
 
                     if (response == null || !response.status.isSuccess()) {
                         log.warn("Failed {}:\n{}", url, response)
