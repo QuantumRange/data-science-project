@@ -24,6 +24,21 @@ dependencies = [
     "warcio>=1.7.5",
     "ipywidgets>=8.1.8",
     "isal>=1.8.0",
+    "mwparserfromhell>=0.7.2",
+    "optimum>=2.1.0",
+    "onnxruntime>=1.24.3",
+    "pycld2>=0.42",
+    "pqdm>=0.2.0",
+    "hy>=1.2.0",
+    "fastwarc>=0.15.2",
+    "trafilatura>=2.0.0",
+    "fast-langdetect>=1.0.0",
+    "selectolax>=0.4.7",
+    "line-profiler>=5.0.2",
+    "hyrule>=1.0.1",
+    "stemmer>=0.0.4",
+    "pystemmer>=3.0.0",
+    "nltk>=3.9.3",
 ]
 
 [[tool.uv.index]]

@@ -38,7 +38,7 @@ fun main(): Unit = runMain {
 
         val semaphore = Semaphore(64)
 
-        val jobs = File("/home/qr/data/crawl")
+        val jobs = File("/home/qr/data/crawl/")
             .listFiles()
             .filter { it.length() != 0L }
             .shuffled()
@@ -57,9 +57,7 @@ fun main(): Unit = runMain {
 
                                 val language = StemService.detectLanguage(text)
 
-                                val stemmed = StemService.processText(text, language?.language)
-
-                                channel.send(language to stemmed)
+                                channel.send(language to text)
                             }
                         }
                     }
@@ -76,7 +74,7 @@ fun main(): Unit = runMain {
             .chunked(100_000)
             .withIndex()
             .collect { (idx, data) ->
-                val file = File("/mnt/Fast2T/data/grok/$idx.parquet")
+                val file = File("/mnt/Fast2T/data/heh/$idx.parquet")
 
                 ParquetService.write(file, ParquetSchema.CD_DATA, data.asFlow()) { (language, text) ->
                     put("language", language?.language ?: "UNKNOWN")

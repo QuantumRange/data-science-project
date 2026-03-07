@@ -6,7 +6,7 @@ import java.io.File
 
 object CompressedStorage : PipelineStorage {
 
-    override val directory: File = File("/mnt/Fast2T/data/compressed/")
+    override val directory: File = File("/mnt/data-dump/compressed/")
     override val isWrite: Boolean = true
 
     override suspend fun allocate(name: String): FileHolder = FileHolder(

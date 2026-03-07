@@ -5,6 +5,9 @@ import dev.qr.script.pipeline.transformer.LinkProcessingTransformer
 import dev.qr.scripts.pipeline.PipelineStorage
 import dev.qr.script.pipeline.storage.LinkStorage
 import dev.qr.extension.runMain
+import dev.qr.script.pipeline.storage.EnrichStorage
+import dev.qr.script.pipeline.transformer.GoodTransformer
+import dev.qr.script.pipeline.transformer.TextTransformer
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -21,9 +24,9 @@ fun main(): Unit = runMain {
 
     val pipelineJob = launch {
 //        CompressorTransformer.apply(SourceStorage, CompressedStorage)
-        IdInjectorTransformer.apply(CompressedStorage, IdInjectedStorage)
+//        IdInjectorTransformer.apply(CompressedStorage, IdInjectedStorage)
 //        TextTransformer.apply(IdInjectedStorage, TextStorage)
-        LinkProcessingTransformer.apply(TextStorage, LinkStorage)
+        GoodTransformer.apply(TextStorage, EnrichStorage)
     }
 
     Runtime.getRuntime().addShutdownHook(Thread {
