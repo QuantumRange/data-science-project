@@ -95,6 +95,9 @@ will first sort the database index by the urls lexicographically,
 which will in turn enable us to find an index in logarithmic
 time. This requires [[https://numpy.org/][numpy]].
 
+*IDEA*: Use hashes instead. These will not be incremental but won't
+require a lookup table when processing all of the data.
+
 #+begin_src jupyter-python :results none :noweb-ref imports :tangle no
   import numpy as np
 #+end_src
@@ -335,6 +338,16 @@ components of size greater than one.
   CPU times: user 1.5 s, sys: 9.12 ms, total: 1.51 s
   Wall time: 1.51 s
 #+end_example
+
+* Working with super-massive graphs
+- https://www.w3reference.com/blog/read-write-networkx-graph-object/#why-networkx-struggles-with-massive-graphs
+
+What to do?
+- store in chunks and stream data
+- filtering while loading
+- using efficient formats (parquet, gzipped tsv/csv)
+- optimizing data types
+
 
 * COMMENT experimental
 
