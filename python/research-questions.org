@@ -1,0 +1,393 @@
+#+property: header-args:jupyter-python :session *jupyter* :eval no-export :async yes :exports both
+#+todo: TODO(t) NEXT(n) | DONE(d)
+
+* COMMENT Misc + Testing + Interactive loading
+
+#+begin_src jupyter-python :results none
+  datadir = Path("../../data/").resolve()
+#+end_src
+
+* Missing Requirements
+
+** TODO web content type classification (article, blog, wiki, ...)
+
+The following classifications seem somewhat reasonable:
+- Blog :: url contains =blog=.
+- Wiki :: url contains =wiki=.
+- News site :: url contains =articles= or even =/articles/= or
+  =/news/=. Alternatively we can consider using the list of newsapi or
+  something https://newsapi.org/docs/endpoints/sources
+
+#+header: :var datafile=(read-file-name "Datafile (.parquet): ")
+#+begin_src jupyter-python :eval no-export
+  import polars as pl
+  from enum import Enum
+
+  with open("data/newsapi-sites.txt", "r") as f:
+      d = [l.strip() for l in f.readlines()]
+      news_domains = ["/"+l for l in d] + ["."+l for l in d]
+      
+  TopicPl = pl.Enum(["UNKNOWN", "BLOG", "WIKI", "NEWS", "NEWSAPI"])
+
+  df = (
+      pl.read_parquet(datafile)
+      .with_columns(
+          pl.when(pl.col("url").str.contains("/blog/|blog\\.")).then(pl.lit("BLOG"))
+          .when(pl.col("url").str.contains("/wiki|\\.wiki|wiki\\.")).then(pl.lit("WIKI"))
+          .when(pl.col("url").str.contains("/news/|/articles/|articles\\.|news\\.")).then(pl.lit("NEWS"))
+          .when(pl.col("url").str.contains_any(news_domains)).then(pl.lit("NEWSAPI"))
+          .otherwise(pl.lit("UNKNOWN"))
+          .cast(TopicPl).alias("topic")
+      )
+  )
+
+  print(news_domains)
+  print(df.filter(pl.col("topic") == "NEWSAPI"))
+#+end_src
+
+#+RESULTS:
+#+begin_example
+  ['/abcnews.go.com', '/www.abc.net.au/news', '/www.aftenposten.no', '/www.aljazeera.com', '/www.ansa.it', '/www.argaam.com', '/arstechnica.com', '/arynews.tv/ud/', '/apnews.com/', '/www.afr.com', '/www.axios.com', '/www.bbc.co.uk/news', '/www.bbc.co.uk/sport', '/www.bild.de', '/br.blastingnews.com', '/www.bleacherreport.com', '/www.bloomberg.com', '/www.breitbart.com', '/www.businessinsider.com', '/www.buzzfeed.com', '/www.cbc.ca/news', '/www.cbsnews.com', '/us.cnn.com', '/cnnespanol.cnn.com/', '/www.ccn.com', '/www.tagesspiegel.de', '/www.zeit.de/index', '/www.elmundo.es', '/www.engadget.com', '/www.ew.com', '/www.espn.com', '/www.espncricinfo.com/', '/financialpost.com', '/www.focus.de', '/www.football-italia.net', '/fortune.com', '/www.fourfourtwo.com/news', '/www.foxnews.com', '/www.foxsports.com', '/www.globo.com/', '/news.google.com', '/news.google.com', '/news.google.com', '/news.google.com', '/news.google.com', '/news.google.com', '/news.google.com', '/news.google.com', '/news.google.com', '/news.google.com', '/news.google.com', '/news.google.com', '/www.gp.se', '/www.gruenderszene.de', '/news.ycombinator.com', '/www.handelsblatt.com', '/www.ign.com', '/www.ilsole24ore.com', '/www.independent.co.uk', '/www.infobae.com/?noredirect', '/www.infomoney.com.br', '/www.lagaceta.com.ar', '/www.lanacion.com.ar', '/www.repubblica.it', '/www.lemonde.fr', '/lenta.ru', '/www.lequipe.fr', '/www.lesechos.fr', '/www.liberation.fr', '/www.marca.com', '/mashable.com', '/www.medicalnewstoday.com', '/www.ms.now', '/www.mtv.com/news', '/www.mtv.co.uk/news', '/news.nationalgeographic.com', '/www.nationalreview.com/', '/www.nbcnews.com', '/www.news24.com', '/www.newscientist.com/section/news', '/www.news.com.au', '/www.newsweek.com', '/nymag.com/', '/www.nextbigfuture.com', '/www.nfl.com', '/www.nhl.com/news', '/www.nrk.no', '/www.politico.com', '/www.polygon.com', '/www.rbc.ru', '/www.recode.net', '/www.reddit.com/r/all', '/russian.rt.com', '/www.rte.ie/news', '/www.rtlnieuws.nl/', '/sabq.org', '/www.spiegel.de', '/www.svd.se', '/t3n.de', '/talksport.com', '/techcrunch.com', '/techcrunch.cn', '/www.techradar.com', '/www.theamericanconservative.com/', '/www.theglobeandmail.com', '/thehill.com', '/www.thehindu.com', '/www.huffingtonpost.com', '/www.irishtimes.com', '/www.jpost.com/', '/www.theladbible.com', '/thenextweb.com', '/www.thesportbible.com', '/timesofindia.indiatimes.com', '/www.theverge.com', '/www.wsj.com', '/www.washingtonpost.com', '/www.washingtontimes.com/', '/time.com', '/www.usatoday.com/news', '/news.vice.com', '/www.wired.com', '/www.wired.de', '/www.wiwo.de', '/xinhuanet.com/', '/www.ynet.co.il', '.abcnews.go.com', '.www.abc.net.au/news', '.www.aftenposten.no', '.www.aljazeera.com', '.www.ansa.it', '.www.argaam.com', '.arstechnica.com', '.arynews.tv/ud/', '.apnews.com/', '.www.afr.com', '.www.axios.com', '.www.bbc.co.uk/news', '.www.bbc.co.uk/sport', '.www.bild.de', '.br.blastingnews.com', '.www.bleacherreport.com', '.www.bloomberg.com', '.www.breitbart.com', '.www.businessinsider.com', '.www.buzzfeed.com', '.www.cbc.ca/news', '.www.cbsnews.com', '.us.cnn.com', '.cnnespanol.cnn.com/', '.www.ccn.com', '.www.tagesspiegel.de', '.www.zeit.de/index', '.www.elmundo.es', '.www.engadget.com', '.www.ew.com', '.www.espn.com', '.www.espncricinfo.com/', '.financialpost.com', '.www.focus.de', '.www.football-italia.net', '.fortune.com', '.www.fourfourtwo.com/news', '.www.foxnews.com', '.www.foxsports.com', '.www.globo.com/', '.news.google.com', '.news.google.com', '.news.google.com', '.news.google.com', '.news.google.com', '.news.google.com', '.news.google.com', '.news.google.com', '.news.google.com', '.news.google.com', '.news.google.com', '.news.google.com', '.www.gp.se', '.www.gruenderszene.de', '.news.ycombinator.com', '.www.handelsblatt.com', '.www.ign.com', '.www.ilsole24ore.com', '.www.independent.co.uk', '.www.infobae.com/?noredirect', '.www.infomoney.com.br', '.www.lagaceta.com.ar', '.www.lanacion.com.ar', '.www.repubblica.it', '.www.lemonde.fr', '.lenta.ru', '.www.lequipe.fr', '.www.lesechos.fr', '.www.liberation.fr', '.www.marca.com', '.mashable.com', '.www.medicalnewstoday.com', '.www.ms.now', '.www.mtv.com/news', '.www.mtv.co.uk/news', '.news.nationalgeographic.com', '.www.nationalreview.com/', '.www.nbcnews.com', '.www.news24.com', '.www.newscientist.com/section/news', '.www.news.com.au', '.www.newsweek.com', '.nymag.com/', '.www.nextbigfuture.com', '.www.nfl.com', '.www.nhl.com/news', '.www.nrk.no', '.www.politico.com', '.www.polygon.com', '.www.rbc.ru', '.www.recode.net', '.www.reddit.com/r/all', '.russian.rt.com', '.www.rte.ie/news', '.www.rtlnieuws.nl/', '.sabq.org', '.www.spiegel.de', '.www.svd.se', '.t3n.de', '.talksport.com', '.techcrunch.com', '.techcrunch.cn', '.www.techradar.com', '.www.theamericanconservative.com/', '.www.theglobeandmail.com', '.thehill.com', '.www.thehindu.com', '.www.huffingtonpost.com', '.www.irishtimes.com', '.www.jpost.com/', '.www.theladbible.com', '.thenextweb.com', '.www.thesportbible.com', '.timesofindia.indiatimes.com', '.www.theverge.com', '.www.wsj.com', '.www.washingtonpost.com', '.www.washingtontimes.com/', '.time.com', '.www.usatoday.com/news', '.news.vice.com', '.www.wired.com', '.www.wired.de', '.www.wiwo.de', '.xinhuanet.com/', '.www.ynet.co.il']
+  shape: (6, 7)
+  ┌───────────────┬───────────────┬───────────────┬───────────────┬──────────────┬─────────┬─────────┐
+  │ host          ┆ url           ┆ text          ┆ stems         ┆ outflow      ┆ is_ai   ┆ topic   │
+  │ ---           ┆ ---           ┆ ---           ┆ ---           ┆ ---          ┆ ---     ┆ ---     │
+  │ str           ┆ str           ┆ str           ┆ list[struct[2 ┆ list[struct[ ┆ enum    ┆ enum    │
+  │               ┆               ┆               ┆ ]]            ┆ 2]]          ┆         ┆         │
+  ╞═══════════════╪═══════════════╪═══════════════╪═══════════════╪══════════════╪═════════╪═════════╡
+  │ www.xinhuanet ┆ http://www.xi ┆ Video         ┆ [{",",6},     ┆ []           ┆ UNKNOWN ┆ NEWSAPI │
+  │ .com          ┆ nhuanet.com/e ┆ PlayerClose   ┆ {"(",4}, …    ┆              ┆         ┆         │
+  │               ┆ ngli…         ┆ Goalkeeper I… ┆ {"playerc…    ┆              ┆         ┆         │
+  │ www.breitbart ┆ https://www.b ┆ In a          ┆ [{",",26},    ┆ [{"www.faceb ┆ HUMAN   ┆ NEWSAPI │
+  │ .com          ┆ reitbart.com/ ┆ poetically    ┆ {"“",17}, …   ┆ ook.com",2}, ┆         ┆         │
+  │               ┆ the-…         ┆ beautiful     ┆ {"nolte…      ┆ {"twi…       ┆         ┆         │
+  │               ┆               ┆ beat…         ┆               ┆              ┆         ┆         │
+  │ www.espncrici ┆ https://www.e ┆ RESULT        ┆ [{",",15},    ┆ []           ┆ HUMAN   ┆ NEWSAPI │
+  │ nfo.com       ┆ spncricinfo.c ┆ 2nd           ┆ {":",11}, …   ┆              ┆         ┆         │
+  │               ┆ om/s…         ┆ Semi-Final,   ┆ {"quest…      ┆              ┆         ┆         │
+  │               ┆               ┆ Sharjah…      ┆               ┆              ┆         ┆         │
+  │ www.foxsports ┆ https://www.f ┆ Woeful        ┆ [{",",97},    ┆ [{"www.faceb ┆ HUMAN   ┆ NEWSAPI │
+  │ .com.au       ┆ oxsports.com. ┆ wingers flop  ┆ {".",96}, …   ┆ ook.com",1}, ┆         ┆         │
+  │               ┆ au/f…         ┆ as flyin’ …   ┆ {"ask",…      ┆ {"www…       ┆         ┆         │
+  │ www.foxsports ┆ https://www.f ┆ ‘Haven’t got  ┆ [{"’",30},    ┆ [{"www.faceb ┆ HUMAN   ┆ NEWSAPI │
+  │ .com.au       ┆ oxsports.com. ┆ another       ┆ {".",19}, …   ┆ ook.com",1}, ┆         ┆         │
+  │               ┆ au/n…         ┆ gear’: Gu…    ┆ {"retir…      ┆ {"www…       ┆         ┆         │
+  │ www.jpost.com ┆ https://www.j ┆ Facebook      ┆ [{"facebook", ┆ [{"www.faceb ┆ UNKNOWN ┆ NEWSAPI │
+  │               ┆ post.com/brea ┆ expands       ┆ 1}, {"expand" ┆ ook.com",1}, ┆         ┆         │
+  │               ┆ king…         ┆ 'Local        ┆ ,1},…         ┆ {"www…       ┆         ┆         │
+  │               ┆               ┆ Alert'…       ┆               ┆              ┆         ┆         │
+  └───────────────┴───────────────┴───────────────┴───────────────┴──────────────┴─────────┴─────────┘
+#+end_example
+
+*** Testing
+#+name: newsapi-sites
+#+header: :var key=(let ((path ".newsapi-key")) (if (f-exists? path) (f-read path) (read-passwd "API Key: ")))
+#+begin_src sh :results file :file data/newsapi-sites.json :cache yes :eval no-export
+  curl "https://newsapi.org/v2/top-headlines/sources?apiKey=$key"
+#+end_src
+
+#+RESULTS[882836bdadee5db388ecd5e16f3e80ac696517fe]: newsapi-sites
+[[file:data/newsapi-sites.json]]
+
+#+begin_src python :results output file :file data/newsapi-sites.txt
+  import json
+
+  with open("data/newsapi-sites.json", "r") as f:
+      d = json.load(f)
+      
+  sources = []
+  for source in d['sources']:
+      url = source['url']
+      if url.startswith('https://'):
+          url = url[8:]
+      elif url.startswith('http://'):
+          url = url[7:]
+      print(url)
+      sources.append(url)
+#+end_src
+
+#+RESULTS:
+[[file:data/newsapi-sites.txt]]
+
+#+begin_src jupyter-python
+  # datafile = datadir / "stage_5" / os.listdir(datadir / "stage_5")[1]
+  # df = pl.read_parquet(datafile)
+  print(sources)
+  for url in df['url']:
+      c = False
+      for source in sources:
+          if source in url:
+              print(source, url)
+              c = True
+              break
+          
+      if c:
+      # if "/news/" in url:
+          print(url)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+  ['abcnews.go.com', 'www.abc.net.au/news', 'www.aftenposten.no', 'www.aljazeera.com', 'www.ansa.it', 'www.argaam.com', 'arstechnica.com', 'arynews.tv/ud/', 'apnews.com/', 'www.afr.com', 'www.axios.com', 'www.bbc.co.uk/news', 'www.bbc.co.uk/sport', 'www.bild.de', 'br.blastingnews.com', 'www.bleacherreport.com', 'www.bloomberg.com', 'www.breitbart.com', 'www.businessinsider.com', 'www.buzzfeed.com', 'www.cbc.ca/news', 'www.cbsnews.com', 'us.cnn.com', 'cnnespanol.cnn.com/', 'www.ccn.com', 'www.tagesspiegel.de', 'www.zeit.de/index', 'www.elmundo.es', 'www.engadget.com', 'www.ew.com', 'www.espn.com', 'www.espncricinfo.com/', 'financialpost.com', 'www.focus.de', 'www.football-italia.net', 'fortune.com', 'www.fourfourtwo.com/news', 'www.foxnews.com', 'www.foxsports.com', 'www.globo.com/', 'news.google.com', 'news.google.com', 'news.google.com', 'news.google.com', 'news.google.com', 'news.google.com', 'news.google.com', 'news.google.com', 'news.google.com', 'news.google.com', 'news.google.com', 'news.google.com', 'www.gp.se', 'www.gruenderszene.de', 'news.ycombinator.com', 'www.handelsblatt.com', 'www.ign.com', 'www.ilsole24ore.com', 'www.independent.co.uk', 'www.infobae.com/?noredirect', 'www.infomoney.com.br', 'www.lagaceta.com.ar', 'www.lanacion.com.ar', 'www.repubblica.it', 'www.lemonde.fr', 'lenta.ru', 'www.lequipe.fr', 'www.lesechos.fr', 'www.liberation.fr', 'www.marca.com', 'mashable.com', 'www.medicalnewstoday.com', 'www.ms.now', 'www.mtv.com/news', 'www.mtv.co.uk/news', 'news.nationalgeographic.com', 'www.nationalreview.com/', 'www.nbcnews.com', 'www.news24.com', 'www.newscientist.com/section/news', 'www.news.com.au', 'www.newsweek.com', 'nymag.com/', 'www.nextbigfuture.com', 'www.nfl.com', 'www.nhl.com/news', 'www.nrk.no', 'www.politico.com', 'www.polygon.com', 'www.rbc.ru', 'www.recode.net', 'www.reddit.com/r/all', 'russian.rt.com', 'www.rte.ie/news', 'www.rtlnieuws.nl/', 'sabq.org', 'www.spiegel.de', 'www.svd.se', 't3n.de', 'talksport.com', 'techcrunch.com', 'techcrunch.cn', 'www.techradar.com', 'www.theamericanconservative.com/', 'www.theglobeandmail.com', 'thehill.com', 'www.thehindu.com', 'www.huffingtonpost.com', 'www.irishtimes.com', 'www.jpost.com/', 'www.theladbible.com', 'thenextweb.com', 'www.thesportbible.com', 'timesofindia.indiatimes.com', 'www.theverge.com', 'www.wsj.com', 'www.washingtonpost.com', 'www.washingtontimes.com/', 'time.com', 'www.usatoday.com/news', 'news.vice.com', 'www.wired.com', 'www.wired.de', 'www.wiwo.de', 'xinhuanet.com/', 'www.ynet.co.il']
+  time.com https://cumintime.com/video/290147/stepmother-years-ago-mutual-masturbation-fucking-sucking-cock-masturbations-orgasms-eroticism/
+  https://cumintime.com/video/290147/stepmother-years-ago-mutual-masturbation-fucking-sucking-cock-masturbations-orgasms-eroticism/
+  time.com https://fastestknowntime.com/podcast/147-mick-and-mike
+  https://fastestknowntime.com/podcast/147-mick-and-mike
+  time.com https://juelltime.com/bracelet-finish/polished/
+  https://juelltime.com/bracelet-finish/polished/
+  timesofindia.indiatimes.com https://timesofindia.indiatimes.com/astrology/compatibility/sagittarius-aquarius/conflict-resolution
+  https://timesofindia.indiatimes.com/astrology/compatibility/sagittarius-aquarius/conflict-resolution
+  www.fourfourtwo.com/news https://www.fourfourtwo.com/news/simeone-key-atleticos-success-caminero
+  https://www.fourfourtwo.com/news/simeone-key-atleticos-success-caminero
+  time.com https://www.novelstime.com/novel/6805
+  https://www.novelstime.com/novel/6805
+  time.com https://www.sitgesanytime.com/en/blog/llistat-blog/pln415/we-are-waiting-you
+  https://www.sitgesanytime.com/en/blog/llistat-blog/pln415/we-are-waiting-you
+#+end_example
+
+** TODO Graph (Links)
+
+* Analysis
+
+Files that do not seem to work:
+- =CC-MAIN-20260211052019-20260211082019-00377.parquet=
+- =CC-MAIN-20260211052019-20260211082019-00200.parquet=
+- =CC-MAIN-20260207214431-20260208004431-00272.parquet=
+- =CC-MAIN-20260211052019-20260211082019-00118.parquet=
+- =CC-MAIN-20260211052019-20260211082019-00209.parquet=
+
+All further analysis will need to load our data. The following code
+gets the data location from the user.
+
+#+begin_src jupyter-python :noweb-ref get-data-path :eval no :exports no
+  if len(sys.argv) > 1:
+      datadir = Path(sys.argv[1])
+  else:
+      print("No data directory given. Please provide the data directory as the first command line argument", file=sys.stderr)
+#+end_src
+
+Some common imports will also be listed here.
+
+#+begin_src jupyter-python :noweb-ref imports :results none
+  from pathlib import Path
+  import json
+  import os
+  import polars as pl
+  import progressbar as pb
+  import sys
+#+end_src
+
+** AI Influence
+
+*** DONE What is the mean word usage distribution of AI and non-AI content?
+
+Requires:
+- [X] Web text
+- [X] AI classification
+
+First, we will need to calculate the word distribution for all our
+data. For this we create a script
+[[file:questions/compute-word-distribution.py]].
+
+#+begin_src jupyter-python :noweb yes :eval no :tangle "questions/compute-word-distribution.py"
+  <<imports>>
+#+end_src
+
+The user will need to provide the path to the directory containing all
+the data files. This directory should explicitly contain a =stage_5= directory.
+
+#+begin_src jupyter-python :noweb yes :eval no :tangle "questions/compute-word-distribution.py"
+  <<get-data-path>>
+#+end_src
+
+All data files that the script computes will be stored in the same
+folder.
+
+#+begin_src jupyter-python :results none :tangle "questions/compute-word-distribution.py"
+  # Create working directory.
+  workdir = datadir / "questions/word-distribution/"
+  workdir.mkdir(parents=True, exist_ok=True)
+#+end_src
+
+To compute the word distribution, we simply keep track of all word
+counts globally. We do this for sites classified as =AI=, =UNKNOWN=,
+and =HUMAN=.
+
+#+begin_src jupyter-python :tangle "questions/compute-word-distribution.py"
+  # Create global word count dictionaries.
+  words_ai      = dict()
+  words_unknown = dict()
+  words_human   = dict()
+
+  def add_words(d, w, n = 1):
+      if w in d:
+          d[w] += n
+      else:
+          d[w] = n
+#+end_src
+
+Next, we can just iterate over all our data and count the word
+occurences. To make further processing easier, we also add all words
+that are not used by all categories to the other categories with
+counts ~0~.
+
+#+begin_src jupyter-python :results none :tangle "questions/compute-word-distribution.py"
+  # Count word occurrences through all data files.
+  for datafile in pb.progressbar(os.listdir(datadir / "stage_5")):
+      try:
+          df = pl.read_parquet(datadir / "stage_5" / datafile)
+      except:
+          print(f"WARNING: {datafile} could not be read as a parquet file.", file=sys.stderr)
+          continue
+
+      for stems in df.filter(pl.col('is_ai').eq('AI'))['stems']:
+          for stem in stems:
+              add_words(words_ai, stem['stem'], stem['occurrence'])
+              add_words(words_unknown, stem['stem'], 0)
+              add_words(words_human, stem['stem'], 0)
+              
+      for stems in df.filter(pl.col('is_ai').eq('UNKNOWN'))['stems']:
+          for stem in stems:
+              add_words(words_ai, stem['stem'], 0)
+              add_words(words_unknown, stem['stem'], stem['occurrence'])
+              add_words(words_human, stem['stem'], 0)
+      for stems in df.filter(pl.col('is_ai').eq('HUMAN'))['stems']:
+          for stem in stems:
+              add_words(words_ai, stem['stem'], 0)
+              add_words(words_unknown, stem['stem'], 0)
+              add_words(words_human, stem['stem'], stem['occurrence'])
+#+end_src
+
+Finally, we write the data to json files for further analysis and
+visualization.
+
+#+begin_src jupyter-python :results none :tangle "questions/compute-word-distribution.py"
+  # Write data to json files.
+  with open(workdir / "ai-word-distribution.json", "w") as f:
+      json.dump(words_ai, f)
+  with open(workdir / "unknown-word-distribution.json", "w") as f:
+      json.dump(words_unknown, f)
+  with open(workdir/ "human-word-distribution.json", "w") as f:
+      json.dump(words_human, f)
+#+end_src
+
+The processing took approximately 25 min for the subset on my
+computer.
+
+*** TODO How much do AI sites cite other AI sites and how do non-AI sites compare?
+
+Requires:
+- [ ] Graph (Links)
+- [X] AI classification
+
+All computation will be done by the following script
+[[file:questions/ai-citation.py]].
+
+#+begin_src jupyter-python :noweb yes :results none :tangle "questions/ai-citation.py"
+  <<imports>>
+#+end_src
+
+The user will need to provide the path to the directory containing all
+the data files. This directory should explicitly contain a =stage_5= directory.
+
+#+begin_src jupyter-python :noweb yes :eval no :tangle "questions/ai-citation.py"
+  <<get-data-path>>
+#+end_src
+
+All data files that the script computes will be stored in the same
+folder.
+
+#+begin_src jupyter-python :results none :tangle "questions/ai-citation.py"
+  # Create working directory.
+  workdir = datadir / "questions/ai-citation/"
+  workdir.mkdir(parents=True, exist_ok=True)
+#+end_src
+
+#+begin_src jupyter-python
+  for datafile in os.listdir(datadir / "stage_5"):
+      datafile = datadir / "stage_5" / datafile
+      df = pl.read_parquet(datafile).filter(pl.col('is_ai').ne("UNKNOWN"))
+      
+      print(df)
+      
+      break
+#+end_src
+
+#+RESULTS:
+#+begin_example
+  shape: (4_711, 6)
+  ┌──────────────────┬─────────────────┬─────────────────┬─────────────────┬─────────────────┬───────┐
+  │ host             ┆ url             ┆ text            ┆ stems           ┆ outflow         ┆ is_ai │
+  │ ---              ┆ ---             ┆ ---             ┆ ---             ┆ ---             ┆ ---   │
+  │ str              ┆ str             ┆ str             ┆ list[struct[2]] ┆ list[struct[2]] ┆ enum  │
+  ╞══════════════════╪═════════════════╪═════════════════╪═════════════════╪═════════════════╪═══════╡
+  │ 58949.dynamicboa ┆ http://58949.dy ┆ How stylish the ┆ [{",",83},      ┆ [{"58949.dynami ┆ HUMAN │
+  │ rd.de            ┆ namicboard.de/t ┆ replica nhl je… ┆ {".",55}, …     ┆ cboard.de",18}, ┆       │
+  │                  ┆ …               ┆                 ┆ {"price…        ┆ …               ┆       │
+  │ airbicy.com      ┆ http://airbicy. ┆ Airwheel’s      ┆ [{".",12},      ┆ [{"airbicy.com" ┆ AI    │
+  │                  ┆ com/2025/06/07/ ┆ electric        ┆ {"travel",10},  ┆ ,9},            ┆       │
+  │                  ┆ …               ┆ suitcase i…     ┆ … {"…           ┆ {"www.elec…     ┆       │
+  │ altesrathaus.org ┆ http://altesrat ┆ Generic         ┆ [{".",100},     ┆ [{"altesrathaus ┆ HUMAN │
+  │                  ┆ haus.org/generi ┆ glucophage xr   ┆ {",",66}, …     ┆ .org",13},      ┆       │
+  │                  ┆ …               ┆ For many…       ┆ {"40mg…         ┆ {"bl…           ┆       │
+  │ amchamvietnam.ch ┆ http://amchamvi ┆ Categories      ┆ [{",",8},       ┆ [{"www.linkedin ┆ HUMAN │
+  │ ambermaster.co…  ┆ etnam.chamberma ┆ Port & Terminal ┆ {".",7}, …      ┆ .com",1},       ┆       │
+  │                  ┆ …               ┆ Fac…            ┆ {"network…      ┆ {"www…          ┆       │
+  │ artesca.co       ┆ http://artesca. ┆ Domain for sale ┆ [{"domain",4},  ┆ [{"www.spaceshi ┆ HUMAN │
+  │                  ┆ co/             ┆ Artesca.co      ┆ {"payment",4},  ┆ p.com",5}]      ┆       │
+  │                  ┆                 ┆ - F…            ┆ …               ┆                 ┆       │
+  │ …                ┆ …               ┆ …               ┆ …               ┆ …               ┆ …     │
+  │ zohofinance.user ┆ https://zohofin ┆ Sign in Zoho    ┆ [{"sign",5},    ┆ []              ┆ HUMAN │
+  │ voice.com        ┆ ance.uservoice. ┆ Books This is a ┆ {".",2}, …      ┆                 ┆       │
+  │                  ┆ …               ┆ p…              ┆ {")",1…         ┆                 ┆       │
+  │ zookeeper.stanfo ┆ https://zookeep ┆ Sun Jan 09,     ┆ [{".",4},       ┆ []              ┆ HUMAN │
+  │ rd.edu           ┆ er.stanford.edu ┆ 2005 3pm - 6pm  ┆ {",",3}, …      ┆                 ┆       │
+  │                  ┆ …               ┆ Zoo…            ┆ {"inform"…      ┆                 ┆       │
+  │ zul.wordpress.or ┆ https://zul.wor ┆ Description     ┆ [{".",83},      ┆ [{"www.linkedin ┆ HUMAN │
+  │ g                ┆ dpress.org/plug ┆ Better Internal ┆ {"-",66}, …     ┆ .com",1},       ┆       │
+  │                  ┆ …               ┆ Li…             ┆ {"relea…        ┆ {"www…          ┆       │
+  │ zul.wordpress.or ┆ https://zul.wor ┆ Plugin Tag:     ┆ [{"notif",11},  ┆ [{"www.linkedin ┆ HUMAN │
+  │ g                ┆ dpress.org/plug ┆ whatsapp        ┆ {"whatsapp",10} ┆ .com",1},       ┆       │
+  │                  ┆ …               ┆ notificat…      ┆ …               ┆ {"www…          ┆       │
+  │ zuniclaw.com     ┆ https://zunicla ┆ Skip to content ┆ [{"&",3},       ┆ [{"www.linkedin ┆ HUMAN │
+  │                  ┆ w.com/en/in-the ┆ Services        ┆ {"insight",3},  ┆ .com",1},       ┆       │
+  │                  ┆ …               ┆ Team            ┆ … {"w…          ┆ {"www…          ┆       │
+  │                  ┆                 ┆ …               ┆                 ┆                 ┆       │
+  └──────────────────┴─────────────────┴─────────────────┴─────────────────┴─────────────────┴───────┘
+#+end_example
+
+
+*** TODO How much do AI generated news articles refer to other sites compared to non-AI articles?
+
+Requires:
+- [ ] Graph (Links)
+- [X] AI classification
+- [ ] web content type classification (article, blog, wiki, ...)
+  
+**** TODO How much do those sites refer to wiki sites?
+
+** AI Topic Terminology
+
+*** NEXT What stems/words most strongly distinguish AI topic pages from non-AI topic pages?
+
+Requires:
+- [X] Web text
+- [X] Stemming
+- [X] AI Topic classification
+
+*** TODO What type of sites (news, wikis, blogs) use what amount of AI buzzwords?
+
+Requires:
+- [X] Web text
+- [X] Stemming
+- [X] AI Topic classification
+- [ ] web content type classification (article, blog, wiki, ...)
+
+
+** Metadata
+
+*** TODO How much do wikis get referenced over other "news"/"information" sources?
+Requires:
+- [ ] web content type classification (article, blog, wiki, ...)
+- [ ] Graph (Links)
+
