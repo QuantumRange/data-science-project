@@ -26,7 +26,7 @@ fun main(): Unit = runMain {
 //        CompressorTransformer.apply(SourceStorage, CompressedStorage)
 //        IdInjectorTransformer.apply(CompressedStorage, IdInjectedStorage)
 //        TextTransformer.apply(IdInjectedStorage, TextStorage)
-        GoodTransformer.apply(TextStorage, EnrichStorage)
+//        GoodTransformer.apply(TextStorage, EnrichStorage)
     }
 
     Runtime.getRuntime().addShutdownHook(Thread {

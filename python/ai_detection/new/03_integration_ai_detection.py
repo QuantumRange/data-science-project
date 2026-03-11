@@ -11,7 +11,7 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer, Batc
 MODEL_ID: str = "fakespot-ai/roberta-base-ai-text-detection-v1"
 NUM_GPU = 4
 BATCH_SIZE = 512
-NUM_TOKENIZERS = 4
+NUM_TOKENIZERS = 6
 
 INPUT_DIR: Path = Path("/workspace/input/")
 OUTPUT_DIR: Path = Path("/workspace/output/")
@@ -38,9 +38,13 @@ def scanner(
             if error_event.is_set():
                 break
 
-            df = pl.read_parquet(file)
-            out_queue.put((file, df))
+            try:
+                df = pl.read_parquet(file)
+                out_queue.put((file, df))
+            except:
+                pass
             bar.update(1)
+
     except Exception as e:
         error_event.set()
         raise
