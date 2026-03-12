@@ -47,7 +47,6 @@ def download_tmp(url: str, name: str, chunk_size=1024) -> Path:
 
 
 if __name__ == '__main__':
-    # Read segments
     print("? Loading segments")
     paths_file: Path = download_tmp(
         f"https://data.commoncrawl.org/crawl-data/{ARCHIVE_VERSION}/warc.paths.gz",
@@ -64,7 +63,6 @@ if __name__ == '__main__':
 
     segments = pl.DataFrame({ "segments": segments }).sample(SEGMENTS_COUNT)["segments"].to_list()
 
-    # Download segments
     print("? Downloading segments")
     for url in tqdm(segments, position=0):
         name = url.split("/")[-1]
