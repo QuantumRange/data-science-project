@@ -1,22 +1,22 @@
-from collections import Counter
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from pathlib import Path
-from typing import Dict, List, Tuple
-from nltk import pos_tag_sents
-from nltk.corpus import english_wordnet, stopwords, wordnet
-from nltk.stem.wordnet import WordNetLemmatizer
-from nltk.tokenize import sent_tokenize, word_tokenize
-from tqdm import tqdm
-
 import os
+import re
 import nltk
 import polars as pl
+
+from collections import Counter
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from functools import lru_cache
+from pathlib import Path
+from typing import Dict, List
+from nltk.corpus import english_wordnet, stopwords, wordnet
+from simplemma import text_lemmatizer
+from tqdm import tqdm
 
 SOURCE_DIR = Path("/mnt/Fast2T/data/stage_4/")
 TARGET_DIR = Path("/mnt/Fast2T/data/stage_5/")
 
-stopwords = set(stopwords.words('english'))
-whitelist = set(english_wordnet.words())
+stopwords = frozenset(stopwords.words('english'))
+whitelist = frozenset(english_wordnet.words())
 
 ai_type = pl.Enum(["AI", "UNKNOWN", "HUMAN"])
 
@@ -30,51 +30,38 @@ blacklist = [
 ]
 
 
-def get_wordnet_pos(tag):
-    if tag.startswith('J'):
-        return wordnet.ADJ
-    elif tag.startswith('V'):
-        return wordnet.VERB
-    elif tag.startswith('N'):
-        return wordnet.NOUN
-    elif tag.startswith('R'):
-        return wordnet.ADV
-    else:
-        return wordnet.NOUN
+@lru_cache(maxsize=256_000)
+def has_synsets(word: str) -> bool:
+    if word in whitelist:
+        return True
+    return bool(wordnet.synsets(word))
 
 
-def stem(lemma: WordNetLemmatizer, text: str) -> List[Dict[str, int]]:
-    positions: List[List[Tuple[str, str]]] = pos_tag_sents(
-        [
-            word_tokenize(sent)
-            for sent in sent_tokenize(text)
-        ],
+def lemmatize(text: str) -> List[Dict[str, int]]:
+    ai_count = sum(
+        Counter(
+            re.findall(r"(?im)[.,\-—!()\s]ai(?=[.,\-—!()\s])|^ai(?=[.,\-—!()\s])|[.,\-—!()\s]ai$|^ai$", text),
+        ).values(),
     )
+    tokens = text_lemmatizer(text.lower(), lang="en")
 
-    tokens: List[str] = [
-        lemma.lemmatize(word, get_wordnet_pos(pos)).lower()
-        for sent in positions
-        for word, pos in sent
-        if wordnet.synsets(word)
-    ]
+    arr = [{ "stem": "ai", "occurrences": ai_count }] if ai_count > 0 else []
 
     return [
-        { "stem": k, "occurrence": v }
+        { "stem": k, "occurrences": v }
         for k, v in Counter(tokens).items()
-    ]
+    ] + arr
 
 
 def process(file: Path) -> None:
-    lemma = WordNetLemmatizer()
-
     target = TARGET_DIR / file.name
     target_tmp = target.with_suffix(".tmp")
 
     (
         pl
-        .read_parquet(file)
-        .filter(pl.col("lang_en") > 0.6)
-        .filter(pl.col("text").str.len_bytes() > 200)
+        .scan_parquet(file)
+        .filter(pl.col("lang_en") > 0.3)
+        .filter(pl.col("text").str.len_bytes() > 100)
         .filter(~pl.col("text").str.contains_any(blacklist))
         .with_columns(
             pl
@@ -91,12 +78,13 @@ def process(file: Path) -> None:
                 return_dtype=pl.List(pl.Struct({ "url": pl.String, "occurrences": pl.Int64 })),
             ),
         )
+        .collect()
         .with_columns(
             pl
             .col("text")
             .map_elements(
-                lambda t: stem(lemma, t),
-                return_dtype=pl.List(pl.Struct({ "stem": pl.String, "occurrence": pl.Int64 })),
+                lemmatize,
+                return_dtype=pl.List(pl.Struct({ "stem": pl.String, "occurrences": pl.Int64 })),
             )
             .alias("stems"),
         )
@@ -115,6 +103,7 @@ if __name__ == '__main__':
     nltk.download('averaged_perceptron_tagger_eng', quiet=True)
 
     files = list(sorted(filter(lambda f: not (TARGET_DIR / f.name).exists(), SOURCE_DIR.glob("*.parquet"))))
+
     with ProcessPoolExecutor(max_workers=32) as executor:
         futures = [executor.submit(process, file) for file in files]
 
