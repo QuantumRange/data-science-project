@@ -1,9 +1,0 @@
-{
-  "type": "record",
-  "name": "CrawlIds",
-  "namespace": "example",
-  "fields": [
-    { "name": "id", "type": "long" },
-    { "name": "url", "type": "string" }
-  ]
-}
