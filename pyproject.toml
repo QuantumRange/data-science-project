@@ -39,6 +39,7 @@ dependencies = [
     "stemmer>=0.0.4",
     "pystemmer>=3.0.0",
     "nltk>=3.9.3",
+    "spacy>=3.8.11",
 ]
 
 [[tool.uv.index]]
