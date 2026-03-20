@@ -1,0 +1,443 @@
+<!-- How is the dataset composed in terms of AI generation, AI topic, and site type? -->
+<div id="treemap-breadcrumb" style="margin-bottom:4px;font-size:16px;"></div>
+<div id="treemap-plot"></div>
+<div id="treemap-controls">
+  <label>
+    Size by
+    <select
+      id="treemap-metric"
+      class="cursor-pointer border-2 border-primary/20 ring-primary/80 rounded-lg focus:outline-none py-1"
+    >
+      <option value="host" selected>Hosts</option>
+      <option value="url">URLs</option>
+    </select>
+  </label>
+  <label class="ml-4 inline-flex items-center gap-1 cursor-pointer">
+    <input type="checkbox" id="treemap-show-other"       class="rounded-sm text-primary cursor-pointer" />
+    Show "Other"
+  </label>
+  <label class="ml-4 inline-flex items-center gap-1 cursor-pointer">
+    <input type="checkbox" id="treemap-show-unknown"       class="rounded-sm text-primary cursor-pointer" checked/>
+    Show "Unknown"
+  </label>
+  <span id="treemap-legend"></span>
+</div>
+
+<script>
+  import * as d3 from "d3";
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+
+  const ASPECT = 1; // square
+
+  const TOPIC_COLORS: Record<string, string> = {
+    BLOG: "#e69f00",
+    NEWS: "#56b4e9",
+    SHOP: "#009e73",
+    WIKI: "#cc79a7",
+    UNKNOWN: "#999",
+  };
+
+  const TOPIC_LABELS: Record<string, string> = {
+    BLOG: "Blog",
+    NEWS: "News",
+    SHOP: "Shop",
+    WIKI: "Wiki",
+    UNKNOWN: "Other",
+  };
+
+  const IS_AI_LABELS: Record<string, string> = {
+    AI: "AI-Generated",
+    HUMAN: "Human",
+    UNKNOWN: "Unknown",
+  };
+
+  const AI_TOPIC_LABELS: Record<string, string> = {
+    AI: "AI Topic",
+    NOT_AI: "Non-AI Topic",
+  };
+
+  function labelFor(depth: number, name: string): string {
+    if (depth === 1) return IS_AI_LABELS[name] ?? name;
+    if (depth === 2) return AI_TOPIC_LABELS[name] ?? name;
+    return TOPIC_LABELS[name] ?? name;
+  }
+
+  // ── DOM refs ────────────────────────────────────────────────────────────────
+
+  const plotDiv = document.querySelector<HTMLElement>("#treemap-plot");
+  const breadcrumbDiv = document.querySelector<HTMLElement>(
+    "#treemap-breadcrumb",
+  );
+  const metricSelect =
+    document.querySelector<HTMLSelectElement>("#treemap-metric");
+  const legendSpan = document.querySelector<HTMLElement>("#treemap-legend");
+  const showOtherCheckbox =
+    document.querySelector<HTMLInputElement>("#treemap-show-other");
+  const showUnknownCheckbox =
+    document.querySelector<HTMLInputElement>("#treemap-show-unknown");
+
+  // ── Types ───────────────────────────────────────────────────────────────────
+
+  interface RawRow {
+    is_ai: string;
+    ai_topic: string;
+    topic: string;
+    host: number;
+    url: number;
+  }
+
+  interface TreeNode {
+    name: string;
+    depth: number;
+    children?: TreeNode[];
+    value?: number;
+  }
+
+  // ── Data ────────────────────────────────────────────────────────────────────
+
+  let rows: RawRow[] = [];
+  let focusPath: string[] = [];
+
+  async function loadData() {
+    rows = (await d3.csv("/graph_data/tree/data.csv", d3.autoType)) as RawRow[];
+  }
+
+  function buildHierarchy(metric: "host" | "url"): TreeNode {
+    const showOther = showOtherCheckbox?.checked ?? false;
+    const showUnknown = showUnknownCheckbox?.checked ?? false;
+    const filtered = rows.filter(
+      (d) =>
+        (showOther || d.topic !== "UNKNOWN") &&
+        (showUnknown || d.is_ai !== "UNKNOWN"),
+    );
+    const grouped = d3.group(
+      filtered,
+      (d) => d.is_ai,
+      (d) => d.ai_topic,
+    );
+    const children: TreeNode[] = [];
+
+    for (const [isAi, aiTopicMap] of grouped) {
+      const isAiChildren: TreeNode[] = [];
+      for (const [aiTopic, topicRows] of aiTopicMap) {
+        const topicChildren: TreeNode[] = topicRows.map((r) => ({
+          name: r.topic,
+          depth: 3,
+          value: r[metric],
+        }));
+        isAiChildren.push({ name: aiTopic, depth: 2, children: topicChildren });
+      }
+      children.push({ name: isAi, depth: 1, children: isAiChildren });
+    }
+
+    return { name: "Dataset", depth: 0, children };
+  }
+
+  function extractSubtree(tree: TreeNode, path: string[]): TreeNode {
+    let node = tree;
+    for (const name of path) {
+      const child = node.children?.find((c) => c.name === name);
+      if (!child) return tree;
+      node = child;
+    }
+    return node;
+  }
+
+  // ── Breadcrumb ──────────────────────────────────────────────────────────────
+
+  function renderBreadcrumb() {
+    if (!breadcrumbDiv) return;
+
+    if (focusPath.length === 0) {
+      breadcrumbDiv.style.display = "none";
+      return;
+    }
+
+    breadcrumbDiv.style.display = "";
+
+    const segments: { label: string; pathLen: number }[] = [
+      { label: "All", pathLen: 0 },
+    ];
+    for (let i = 0; i < focusPath.length; i++) {
+      segments.push({
+        label: labelFor(i + 1, focusPath[i]),
+        pathLen: i + 1,
+      });
+    }
+
+    breadcrumbDiv.innerHTML = segments
+      .map((s, i) => {
+        if (i === segments.length - 1) {
+          return `<span style="font-weight:bold;">${s.label}</span>`;
+        }
+        return `<a href="#" data-pathlen="${s.pathLen}" style="cursor:pointer;text-decoration:underline;">${s.label}</a>`;
+      })
+      .join(" › ");
+
+    breadcrumbDiv.querySelectorAll("a").forEach((a) => {
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        const len = Number((a as HTMLElement).dataset.pathlen);
+        focusPath = focusPath.slice(0, len);
+        rerender();
+      });
+    });
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
+  function render(metric: "host" | "url") {
+    if (!plotDiv) return;
+    plotDiv.innerHTML = "";
+
+    const WIDTH = plotDiv.clientWidth || 700;
+    const HEIGHT = Math.round(WIDTH * ASPECT);
+
+    const fullData = buildHierarchy(metric);
+
+    // Compute global total from full tree
+    const globalTotal =
+      d3.hierarchy(fullData).sum((d) => d.value ?? 0).value ?? 1;
+
+    // Extract the focused subtree as plain data, then build a fresh hierarchy
+    const subtreeData = extractSubtree(fullData, focusPath);
+    const root = d3
+      .hierarchy(subtreeData)
+      .sum((d) => d.value ?? 0)
+      .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+
+    const localTotal = root.value ?? 1;
+
+    d3
+      .treemap<TreeNode>()
+      .size([WIDTH, HEIGHT])
+      .paddingOuter(6)
+      .paddingTop(24)
+      .paddingInner(3)
+      .round(true)(root);
+
+    renderBreadcrumb();
+
+    const svg = d3
+      .select(plotDiv)
+      .append("svg")
+      .attr("viewBox", `0 0 ${WIDTH} ${HEIGHT}`)
+      .attr("width", "100%");
+
+    // ── Clip paths for groups ──
+
+    const defs = svg.append("defs");
+
+    // ── Group backgrounds (internal nodes below root) ──
+
+    const groups = root.descendants().filter((d) => d !== root && d.children);
+
+    groups.forEach((d: any, i) => {
+      defs
+        .append("clipPath")
+        .attr("id", `group-clip-${i}`)
+        .append("rect")
+        .attr("x", d.x0)
+        .attr("y", d.y0)
+        .attr("width", d.x1 - d.x0)
+        .attr("height", d.y1 - d.y0);
+    });
+
+    function zoomPath(d: d3.HierarchyNode<TreeNode>): string[] {
+      // Build absolute focusPath from the node's ancestors (skip tree root)
+      const names = d
+        .ancestors()
+        .reverse()
+        .slice(1)
+        .map((a) => a.data.name);
+      return [...focusPath, ...names];
+    }
+
+    const groupRects = svg
+      .selectAll("rect.group")
+      .data(groups)
+      .join("rect")
+      .attr("x", (d: any) => d.x0)
+      .attr("y", (d: any) => d.y0)
+      .attr("width", (d: any) => d.x1 - d.x0)
+      .attr("height", (d: any) => d.y1 - d.y0)
+      .attr("fill", "currentColor")
+      .attr("fill-opacity", (d) => (d.children?.[0]?.children ? 0.06 : 0.03))
+      .attr("stroke", "currentColor")
+      .attr("stroke-opacity", (d) => (d.children?.[0]?.children ? 0.4 : 0.15))
+      .attr("stroke-width", (d) => (d.children?.[0]?.children ? 1.5 : 0.5))
+      .attr("cursor", "pointer");
+
+    // Click group to zoom in
+    groupRects.on("click", (_, d) => {
+      if (!d.children) return;
+      focusPath = zoomPath(d);
+      rerender();
+    });
+
+    // ── Group labels ──
+
+    svg
+      .selectAll("text.group-label")
+      .data(groups)
+      .join("text")
+      .attr("x", (d: any) => d.x0 + 4)
+      .attr("y", (d: any) => d.y0 + 15)
+      .text((d: any) => {
+        // Hide label if the group box is too small
+        if (d.y1 - d.y0 < 20 || d.x1 - d.x0 < 40) return "";
+        const label = labelFor(d.data.depth, d.data.name);
+        const pct = d3.format(".1%")((d.value ?? 0) / localTotal);
+        return `${label} (${pct})`;
+      })
+      .attr("font-size", (d) => (d.children?.[0]?.children ? 15 : 13))
+      .attr("font-weight", (d) =>
+        d.children?.[0]?.children ? "bold" : "normal",
+      )
+      .attr("fill", "currentColor")
+      .attr("fill-opacity", 0.7)
+      .attr("clip-path", (_, i) => `url(#group-clip-${i})`)
+      .attr("cursor", "pointer")
+      .on("click", (_, d) => {
+        if (!d.children) return;
+        focusPath = zoomPath(d);
+        rerender();
+      });
+
+    // ── Leaf tiles ──
+
+    const leaves = root.leaves();
+
+    const leafRects = svg
+      .selectAll("rect.leaf")
+      .data(leaves)
+      .join("rect")
+      .attr("x", (d: any) => d.x0)
+      .attr("y", (d: any) => d.y0)
+      .attr("width", (d: any) => d.x1 - d.x0)
+      .attr("height", (d: any) => d.y1 - d.y0)
+      .attr("fill", (d) => TOPIC_COLORS[d.data.name] ?? "#ccc")
+      .attr("fill-opacity", 0.85)
+      .attr("stroke", "#fff")
+      .attr("stroke-width", 0.5)
+      .attr("cursor", "pointer");
+
+    // ── Leaf text: name ──
+
+    svg
+      .selectAll("text.leaf-name")
+      .data(leaves)
+      .join("text")
+      .attr("x", (d: any) => d.x0 + 4)
+      .attr("y", (d: any) => d.y0 + 14)
+      .text((d: any) => {
+        if (d.x1 - d.x0 < 36 || d.y1 - d.y0 < 18) return "";
+        return labelFor(d.data.depth, d.data.name);
+      })
+      .attr("font-size", 13)
+      .attr("font-weight", "bold")
+      .attr("fill", "#fff")
+      .attr("pointer-events", "none");
+
+    // ── Leaf text: percentage ──
+
+    svg
+      .selectAll("text.leaf-pct")
+      .data(leaves)
+      .join("text")
+      .attr("x", (d: any) => d.x0 + 4)
+      .attr("y", (d: any) => d.y0 + 26)
+      .text((d: any) => {
+        if (d.x1 - d.x0 < 36 || d.y1 - d.y0 < 28) return "";
+        return d3.format(".1%")((d.value ?? 0) / localTotal);
+      })
+      .attr("font-size", 12)
+      .attr("fill", "#fff")
+      .attr("fill-opacity", 0.8)
+      .attr("pointer-events", "none");
+
+    // ── Leaf text: count ──
+
+    svg
+      .selectAll("text.leaf-val")
+      .data(leaves)
+      .join("text")
+      .attr("x", (d: any) => d.x0 + 4)
+      .attr("y", (d: any) => d.y0 + 38)
+      .text((d: any) => {
+        if (d.x1 - d.x0 < 50 || d.y1 - d.y0 < 42) return "";
+        return d3.format(",")(d.value ?? 0);
+      })
+      .attr("font-size", 12)
+      .attr("fill", "#fff")
+      .attr("fill-opacity", 0.6)
+      .attr("pointer-events", "none");
+
+    // ── Tooltips ──
+
+    leafRects.append("title").text((d) => {
+      // Build full path including the focusPath ancestors
+      const focusLabels = focusPath.map((name, i) => labelFor(i + 1, name));
+      const localLabels = d
+        .ancestors()
+        .reverse()
+        .filter((a) => a !== root)
+        .map((a) => labelFor(a.data.depth, a.data.name));
+      const path = [...focusLabels, ...localLabels].join(" → ");
+      const localPct = d3.format(".2%")((d.value ?? 0) / localTotal);
+      const globalPct = d3.format(".2%")((d.value ?? 0) / globalTotal);
+      const unit = metric === "host" ? "hosts" : "URLs";
+      return `${path}\n${d3.format(",")(d.value ?? 0)} ${unit}\n${localPct} of view · ${globalPct} of total`;
+    });
+
+    // ── Hover ──
+
+    leafRects
+      .on("mouseenter", function (_, d) {
+        leafRects.attr("fill-opacity", (b) => (b === d ? 1 : 0.3));
+      })
+      .on("mouseleave", function () {
+        leafRects.attr("fill-opacity", 0.85);
+      });
+  }
+
+  // ── Legend (HTML) ──────────────────────────────────────────────────────────
+
+  function buildLegend() {
+    if (!legendSpan) return;
+    const showOther = showOtherCheckbox?.checked ?? false;
+    const topics = showOther
+      ? ["BLOG", "NEWS", "SHOP", "WIKI", "UNKNOWN"]
+      : ["BLOG", "NEWS", "SHOP", "WIKI"];
+    legendSpan.innerHTML = topics
+      .map(
+        (t) =>
+          `<span style="display:inline-flex;align-items:center;gap:3px;margin-left:12px;">` +
+          `<span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:${TOPIC_COLORS[t]};"></span>` +
+          `<span style="font-size:15px;">${TOPIC_LABELS[t]}</span>` +
+          `</span>`,
+      )
+      .join("");
+  }
+
+  // ── Init ────────────────────────────────────────────────────────────────────
+
+  function rerender() {
+    // Reset focus if the zoomed-into node was filtered out
+    const showUnknown = showUnknownCheckbox?.checked ?? false;
+    if (!showUnknown && focusPath.includes("UNKNOWN")) {
+      focusPath = focusPath.slice(0, focusPath.indexOf("UNKNOWN"));
+    }
+    buildLegend();
+    render((metricSelect?.value ?? "host") as "host" | "url");
+  }
+
+  await loadData();
+  buildLegend();
+  rerender();
+
+  metricSelect?.addEventListener("change", rerender);
+  showOtherCheckbox?.addEventListener("change", rerender);
+  showUnknownCheckbox?.addEventListener("change", rerender);
+</script>

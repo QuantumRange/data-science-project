@@ -1,0 +1,14 @@
+---
+interface Props {
+  title?: string;
+  class?: string;
+  id?: string;
+}
+
+const { title, class: className, id } = Astro.props;
+const slug = id ?? title?.toLowerCase().replace(/\s+/g, "-");
+---
+<section id={slug ? slug : undefined} class:list={["bg-white p-5 shadow-md rounded-lg my-5 scroll-mt-12", className]}>
+<h2 class="tracking-tight text-2xl font-medium my-3 border-b-2 pb-1 border-primary">{title}</h2>
+<slot/>
+</section>

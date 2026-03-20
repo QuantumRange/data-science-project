@@ -1,0 +1,193 @@
+---
+import Layout from "../layouts/Layout.astro";
+import TitleBar from "@components/TitleBar.astro";
+import ContentBox from "@components/ContentBox.astro";
+import WordCloud from "@components/Graphs/WordCloud.astro";
+import AiTreemap from "@components/Graphs/AiTreemap.astro";
+
+import WikiReferences from "@components/Graphs/WikiReferences.astro";
+import AiBuzzwords from "@components/Graphs/AiBuzzwords.astro";
+import AiDistinguishingWords from "@components/Graphs/AiDistinguishingWords.astro";
+import TabItem from "@components/TabItem.astro";
+import Tabs from "@components/Tabs.astro";
+import NewsRefs from "@components/Graphs/NewsRefs.astro";
+import NetworkFlow from "@components/Graphs/NetworkFlow.astro";
+import IC from "@components/IC.astro";
+import Popover from "@components/Popover.astro";
+---
+
+<Layout>
+  <ContentBox title="Introduction">
+    We analyzed a slice of the internet <b>by parsing around 27 million URLs</b> with
+    the goal of investigating the influence of AI on the web. In the beginning, we
+    crawled our own web data by recursively traversing links from a set of starting
+    URLs which we later supplemented with similar data from Common Crawl. In our analysis,
+    we were able to classify most pages as either AI or Non-AI, either AI Topic or
+    Non-AI Topic, and into site types, i.e., blogs, news articles, shops, or wikis.
+    Among our findings are notable inclusions such as <b
+      >AI-heavy domains tending to cite other AI-heavy domains</b
+    > than other domains, <b>7% of sites likely being AI-generated</b>, and
+    that, <b
+      >compared to news, blogs talk almost twice as much about AI topics.</b
+    >
+  </ContentBox>
+  <TitleBar title="Al Influence" id="ai-influence" />
+  <ContentBox
+    id="word-usage"
+    title="What word usage differs the most between Al and non-Al content?">
+    <p class="p-1 inline">
+      In these word clouds, we visualized the 10,000 overall most frequently used
+      words and identified the words that are used more by
+    </p><Popover anchor="auto" class="inline-block" summaryclass
+      ><span slot="button" class="text-zinc-700">Al</span><img
+        class="min-w-32 absolute"
+        slot="content"
+        src="/al_generated.jpg"
+      /></Popover
+    >
+    <p class="inline">
+      or human content respectively. It is important to note, that these aren't
+      the most frequently used words by either type of content, but instead they
+      are where the biggest difference lies.
+    </p>
+    <Tabs>
+      <TabItem title="Al" selected>
+        <p class="p-1 pb-4">
+          In the following word cloud, we can identify that Al content uses more
+          stop words like <IC>the</IC>, <IC>of</IC>, and <IC>that</IC>.
+          Furthermore, words like <IC>experience</IC>, <IC>enhance</IC>, <IC
+            >ensure</IC
+          >, and <IC>provide</IC> are more common in Al-written text. There is also
+          a notable increase in punctuation, likely due to the fact that most people
+          are pretty bad at using enough of it. This includes us. Except Emil, he's
+          perfect.
+        </p>
+        <WordCloud type="ai" />
+      </TabItem>
+      <TabItem title="Human">
+        <p class="p-1">
+          In the human word cloud, we find more conversational language. In
+          addition to this, there are more political words, like <IC>Trump</IC>, <IC
+            >Europe</IC
+          >, <IC>War</IC>, <IC>Government</IC>, and even slurs such as <IC
+            >British</IC
+          >. We also find socially taboo topics, with words such as <IC>kill</IC
+          >, <IC>shoot</IC>, <IC>death</IC>, and <IC>suicide</IC>.
+        </p>
+        <WordCloud type="human" />
+      </TabItem>
+    </Tabs>
+  </ContentBox>
+  <ContentBox
+    id="citation"
+    title="How much do Al domains cite other Al domains and how do non-Al domains compare?">
+    <div class="p-1 pb-5">
+      <p>
+        This heatmap visualizes citation patterns between domains based on a
+        chosen variable. Both axes can be configured to show different variables
+        such as Al content, Al topic, or site type. Each axis represents the
+        percentage of that variable on a domain, ranging from 0% (none of the
+        domain's content matches the variable) to 100% (all of it does). The
+        x-axis represents the source domains and the y-axis represents the cited
+        domains. Each cell then shows how strongly domains at one level cite
+        domains at another, revealing whether, for example, high-Al domains
+        preferentially cite other high-Al domains.
+      </p>
+
+      <p>
+        As we can see, domains that are barely or not at all Al-written
+        preferentially cite other non-Al-written domains. This seems to be
+        primarily due to volume though, as there are around 450,000 references
+        to high-Al domains from low-Al domains, compared to the mere 35,000
+        high-Al domains we have. Notably however, a whopping 40% of references
+        in Al-written domains are to other Al-written domains.
+      </p>
+      <p>
+        Most other categories fair similarly, with approximately comparable
+        numbers, except for blogs where nearly 5% of low-Al blogs link to
+        high-Al domains.
+      </p>
+    </div>
+    <NetworkFlow />
+  </ContentBox>
+  <ContentBox
+    id="news-composition"
+    title="How much do Al generated news articles refer to specific categories of sites compared to non-Al articles?">
+    <p class="p-1">
+      To understand how Al influences linking behavior, we took all domains
+      classified as news sites and split them into Al-generated and
+      human-written articles. For each group, we then measured how often they
+      reference different categories of domains such as blogs, shops, wikis, and
+      other news sites. This reveals whether Al-generated articles have
+      different referencing patterns than their human counterparts.
+    </p>
+    <Tabs>
+      <TabItem title="Al Written" selected>
+        <p class="p-1">
+          Human-written news content tends to cite more news instead of wikis.
+          They also have a higher tendency to cite shops.
+        </p>
+        <NewsRefs type="written" />
+      </TabItem>
+      <TabItem title="About Al">
+        <p class="p-1">
+          Human-written news articles that talk about AI tend to have a higher
+          citation to shops and news. non-AI topic articles tend to use more
+          blogs in comparison.
+        </p>
+        <NewsRefs type="topic" />
+      </TabItem>
+    </Tabs>
+  </ContentBox>
+  <TitleBar title="Al Topic Terminology" id="ai-terminology" />
+  <ContentBox
+    id="distinguishing-words"
+    title="What words most strongly distinguish Al topic pages from non-Al topic pages?">
+    <p class="p-1">
+      These are the lemmas (words reduced to their base form, e.g. "running"
+      becomes "run") used differently by Al-topic and non-Al-topic sites. Some
+      words used by Al-topic sites are expected, like <IC>AI</IC>, <IC
+        >business</IC
+      >, <IC>technology</IC>, <IC>model</IC>, <IC>tool</IC>, and <IC>user</IC>.
+    </p>
+    <AiDistinguishingWords />
+  </ContentBox>
+  <ContentBox
+    id="buzzwords"
+    title="What percentage of each site type uses AI buzzwords?">
+    <p class="p-1">
+      Blogs have the most buzzwords, followed by news and wikis. Shops have the
+      lowest usage.
+    </p>
+    <AiBuzzwords />
+  </ContentBox>
+  <TitleBar title="Metadata" id="metadata" />
+  <ContentBox
+    id="wiki-citing"
+    title="How much do wikis get cited over other sources?">
+    <p class="p-1">
+      We can clearly see that wikis are the most cited, followed by news, shops,
+      and – lastly – blogs. When looking at self-referencing, wiki sites by far
+      mostly cite themselves — this is different to the other types that have a
+      bigger portion going to wiki sites instead of citing themselves.
+    </p>
+    <WikiReferences />
+  </ContentBox>
+  <ContentBox
+    id="composition"
+    title="What is the composition in terms of Al generation, Al topic, and site type?">
+    <p class="p-1">
+      Here we can see what this snapshot of the web is composed of. We tried to
+      have an even distribution when crawling, so this should roughly represent
+      a small model of the larger internet. The majority of sites are
+      human-written, which is expected given the large backlog of older sites
+      that were never updated or simply stuck with being human-edited. However,
+      the 10% Al-generated block is a concerning sign. Since Al-generated
+      content can only have appeared in the last few years, this may indicate
+      that a large portion of new websites are Al-written. Note that "Other"
+      refers to sites we couldn't confidently assign to a single category like
+      blog, news, or shop.
+    </p>
+    <AiTreemap />
+  </ContentBox>
+</Layout>

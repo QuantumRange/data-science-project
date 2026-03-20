@@ -1,0 +1,19 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/forms";
+
+@theme {
+    --color-primary: oklch(0.3742 0.1348 257.36)
+}
+
+*::selection {
+  background: var(--color-primary);
+  color: #fafafa;
+}
+*::-moz-selection {
+  background: var(--color-primary);
+  color: #fafafa;
+}
+*::-webkit-selection {
+  background: var(--color-primary);
+  color: #fafafa;
+}

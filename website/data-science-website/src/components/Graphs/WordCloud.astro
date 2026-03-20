@@ -1,0 +1,16 @@
+---
+export interface Props {
+  type?: "human" | "ai";
+}
+
+const { type } = Astro.props;
+---
+
+<!-- Word frequency comparison: AI-generated vs Human-written articles -->
+<div>
+  <img
+    src={`/graph_data/word_distribution/${type ?? "ai"}.svg`}
+    alt="Word cloud"
+    class="w-full aspect-video object-contain"
+  />
+</div>

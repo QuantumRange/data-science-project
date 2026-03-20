@@ -1,0 +1,109 @@
+{/* https://www.codeconcisely.com/posts/javascript-tabs/ */}
+<div class="tabs mt-2 rounded-lg border border-primary/15 bg-primary/4 p-3">
+  <div role="tablist" class="flex w-fit gap-2 rounded-lg bg-white p-1 border border-primary/20 shadow-sm"></div>
+  <slot />
+</div>
+<style>
+  /* .tabs {
+    max-width: 500px;
+    min-height: 300px;
+    border: 1px solid #ececec;
+    border-radius: 0.5rem;
+    box-shadow:
+      rgba(0, 0, 0, 0.1) 0px 4px 6px -1px,
+      rgba(0, 0, 0, 0.06) 0px 2px 4px -1px;
+  } */
+
+  /* div[role="tablist"] {
+    display: flex;
+    gap: 0.25rem;
+    background-color: #d1d1d170;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    border-top-left-radius: 0.5rem;
+    border-top-right-radius: 0.5rem;
+  } */
+
+  /* button[role="tab"] {
+    color: #67769e;
+    background: none;
+    border: none;
+    border-radius: 0.25rem;
+    padding: 0.75rem 1.25rem;
+    cursor: pointer;
+    font-weight: 700;
+  } */
+
+ /* button[role="tab"][aria-selected="true"] {
+    background-color: #ffffff;
+    color: #07409f;
+  }*/
+
+ /* button[role="tab"][aria-selected="false"]:hover {
+    color: #000000;
+  }*/
+  /* div[role="tabpanel"] {
+    padding: 1rem;
+  } */
+</style>
+
+<script>
+  // Runs seperately for each instance, so they don't mess with each other
+  document.querySelectorAll<HTMLElement>(".tabs").forEach(function (tabs) {
+    const tablist = tabs.querySelector<HTMLElement>('[role="tablist"]')!;
+
+    // Since named slots don't work on nested children, we need to manually move the buttons into the right spot
+    tabs
+      .querySelectorAll<HTMLElement>(':scope > button[role="tab"]')
+      .forEach((btn) => tablist.appendChild(btn));
+
+    const tabElements = tablist.querySelectorAll<HTMLElement>('button[role="tab"]');
+    const panelElements = tabs.querySelectorAll<HTMLElement>('[role="tabpanel"]');
+
+
+    // Sets the initial active index
+    const tabArray = Array.from(tabElements);
+    let activeIndex = tabArray.findIndex((tab) => tab.getAttribute("aria-selected") === "true");
+
+    function setActiveTab(index: number) {
+      tabElements[activeIndex].setAttribute("aria-selected", "false");
+      tabElements[activeIndex].setAttribute("tabindex", "-1");
+      tabElements[index].setAttribute("aria-selected", "true");
+      tabElements[index].setAttribute("tabindex", "0");
+      setActivePanel(index);
+      activeIndex = index;
+    }
+
+    function setActivePanel(index: number) {
+      panelElements[activeIndex].setAttribute("hidden", "");
+      panelElements[activeIndex].setAttribute("tabindex", "-1");
+      panelElements[index].removeAttribute("hidden");
+      panelElements[index].setAttribute("tabindex", "0");
+      tabElements[index].focus();
+    }
+
+    tabElements.forEach(function (tab, index) {
+      tab.addEventListener("click", function () {
+        setActiveTab(index);
+      });
+
+      tab.addEventListener("keydown", function (event) {
+        const lastIndex = tabElements.length - 1;
+        const kbevent = event as KeyboardEvent;
+        if (kbevent.code === "ArrowLeft" || kbevent.code === "ArrowUp") {
+          event.preventDefault();
+          setActiveTab(activeIndex === 0 ? lastIndex : activeIndex - 1);
+        } else if (kbevent.code === "ArrowRight" || kbevent.code === "ArrowDown") {
+          event.preventDefault();
+          setActiveTab(activeIndex === lastIndex ? 0 : activeIndex + 1);
+        } else if (kbevent.code === "Home") {
+          event.preventDefault();
+          setActiveTab(0);
+        } else if (kbevent.code === "End") {
+          event.preventDefault();
+          setActiveTab(lastIndex);
+        }
+      });
+    });
+  });
+</script>

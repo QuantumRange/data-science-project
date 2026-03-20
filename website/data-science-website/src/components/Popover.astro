@@ -1,0 +1,78 @@
+---
+interface Props {
+  anchor?: string;
+  class?: string;
+  summaryclass?: boolean,
+}
+
+const { class: className, summaryclass, anchor = "bottom" } = Astro.props;
+---
+
+<details data-popover={anchor} class={className}>
+  <summary class:list={["h-full cursor-pointer", summaryclass && "w-fit"]}>
+    <slot name="button" />
+  </summary>
+  <slot name="content" />
+</details>
+
+<style>
+  details[data-popover] > summary::-webkit-details-marker {
+    display: none;
+  }
+  details[data-popover] > summary {
+    list-style: none;
+  }
+  details[data-popover] {
+    position: relative;
+    width: fit-content;
+  }
+  details[data-popover] > summary + :global(*) {
+    position: absolute;
+  }
+
+  details[data-popover="top"] > summary + :global(*) {
+    bottom: calc(0.5rem + 100%);
+    right: 50%;
+    transform: translateX(50%);
+  }
+  details[data-popover="bottom"] > summary + :global(*) {
+    top: calc(0.5rem + 100%);
+    right: 50%;
+    transform: translateX(50%);
+  }
+</style>
+
+<script>
+  // This script is needed to close the popover when the user clicks on something else, as that can not be solved via CSS to my knowledge
+  const popovers = document.querySelectorAll("details[data-popover]");
+
+  popovers.forEach((detail) => {
+    // Basic existence checks
+    const summary = detail.querySelector("summary");
+    if (!summary) {
+      console.error("No summary found for popover");
+      return;
+    }
+
+    // Using blur crashes the page when anything in the content slot is clicked, so this will do
+    document.addEventListener("click", (e) => {
+      if (!detail.contains(e.target as Node)) {
+        detail.removeAttribute("open");
+      }
+    });
+  });
+
+  // Positioning with auto anchor
+  function updateAnchor() {
+    if (window.innerWidth > 1024) {
+      popovers.forEach((detail) =>
+        detail.setAttribute("data-popover", "bottom"),
+      );
+    } else {
+      popovers.forEach((detail) => detail.setAttribute("data-popover", "top"));
+    }
+  }
+  updateAnchor();
+  window.addEventListener("resize", updateAnchor);
+</script>
+
