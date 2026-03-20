@@ -1,0 +1,129 @@
+---
+import Layout from "../layouts/Layout.astro";
+import TitleBar from "@components/TitleBar.astro";
+import ContentBox from "@components/ContentBox.astro";
+---
+
+<Layout>
+  <TitleBar title="Data Process" />
+  <ContentBox title="Data Acquisition">
+    <p class="p-1">
+      Our dataset draws from three primary sources. The bulk of the data comes
+      from <a class="underline text-primary" href="https://commoncrawl.org/"
+        >Common Crawl</a
+      >, specifically the <code>CC-MAIN-2026-04</code> archive from January 2026,
+      which contains 2.30 billion web pages across roughly 70 TiB of data. Due to
+      time and bandwidth constraints, we processed 10 TiB of that archive. To classify
+      pages by topic, we used <a
+        class="underline text-primary"
+        href="https://newsapi.org/">NewsAPI</a
+      > as a source of known news domains. To classify whether text was Al-generated,
+      we used the
+      <a
+        class="underline text-primary"
+        href="https://huggingface.co/fakespot-ai/roberta-base-ai-text-detection-v1"
+        >fakespot-ai/roberta-base-ai-text-detection-v1</a
+      > model from Hugging Face.
+    </p>
+  </ContentBox>
+
+  <ContentBox title="Filtering">
+    <p class="p-1">
+      <!-- The main text of each page was extracted from raw HTML using
+      <a
+        class="underline text-primary"
+        href="https://trafilatura.readthedocs.io/">Trafilatura</a
+      >, and non-English pages were filtered out using
+      <a
+        class="underline text-primary"
+        href="https://github.com/LlmKira/fast-langdetect">fast-langdetect</a
+      >.  -->
+      The main text of each page was extracted from raw HTML using Trafilatura, that
+      means just visible text that actually counts as content. This excludes footer
+      text for example. It is very similar to what what the firefox reader view does.
+      We also removed all non-English pages using fast-langdetect. At first we tried
+      not to but almost all of our remaining classification is much worse or not possible
+      for other languages. Thus we decided to stick to an English subset of the data.
+    </p>
+  </ContentBox>
+
+  <ContentBox title="Enrichment">
+    <p class="p-1">
+      We extracted 3 key feature from the filtered data. First we used the text
+      with our AI Text Classification model to create a label "AI", "HUMAN",
+      "UNSURE". Then we tokenized the text, extracting all words and lemmatizing
+      them. We counted them up into a distribution per site. Finally we checked
+      how many AI Companies or AI related keywords where in this distribution
+      and labeled the data "AI TOPIC" and "NOT AI TOPIC". At last we looked at
+      the url and determent by the domain if a site was a shop, news or other
+      site. We also used other sources like NewsAPI, etc. for the topic
+      classification in "NEWS", "SHOP", "BLOG" and "WIKI".
+    </p>
+  </ContentBox>
+
+  <TitleBar title="Data Sources" />
+
+  <ContentBox title="Common Crawl">
+    <div class="p-1 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+      <span class="font-medium">Format</span>
+      <span
+        >Raw WARC files (HTTP responses with headers and full page content)</span
+      >
+      <span class="font-medium">Output</span>
+      <span>URL, HTTP headers, raw HTML body</span>
+      <span class="font-medium">Purpose</span>
+      <span
+        >Bulk web page data from the <code>CC-MAIN-2026-04</code> archive (January
+        2026)</span
+      >
+      <span class="font-medium">Link</span>
+      <span
+        ><a class="underline text-primary" href="https://commoncrawl.org/"
+          >commoncrawl.org</a
+        ></span
+      >
+    </div>
+  </ContentBox>
+
+  <ContentBox title="NewsAPI">
+    <div class="p-1 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+      <span class="font-medium">Format</span>
+      <span
+        >JSON (REST API, <code>/v2/top-headlines/sources</code> endpoint)</span
+      >
+      <span class="font-medium">Output</span>
+      <span>URL</span>
+      <span class="font-medium">Purpose</span>
+      <span>Tag pages as news articles for topic-per-page classification</span>
+      <span class="font-medium">Link</span>
+      <span
+        ><a class="underline text-primary" href="https://newsapi.org/"
+          >newsapi.org</a
+        ></span
+      >
+    </div>
+  </ContentBox>
+
+  <ContentBox title="Fakespot Al Detection Model">
+    <div class="p-1 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+      <span class="font-medium">Format</span>
+      <span
+        >Hugging Face model (<code
+          >fakespot-ai/roberta-base-ai-text-detection-v1</code
+        >, RoBERTa base)</span
+      >
+      <span class="font-medium">Output</span>
+      <span><code>AI</code>, <code>HUMAN</code> labels</span>
+      <span class="font-medium">Purpose</span>
+      <span>Score each page's likelihood of being Al-generated</span>
+      <span class="font-medium">Link</span>
+      <span
+        ><a
+          class="underline text-primary"
+          href="https://huggingface.co/fakespot-ai/roberta-base-ai-text-detection-v1"
+          >Hugging Face</a
+        ></span
+      >
+    </div>
+  </ContentBox>
+</Layout>

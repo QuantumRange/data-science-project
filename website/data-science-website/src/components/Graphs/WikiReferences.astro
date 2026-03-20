@@ -1,0 +1,353 @@
+<!-- How much do wikis get referenced over other "news"/"information" sources? -->
+<div id="sankey-plot" class="relative"></div>
+<div id="sankey-controls">
+  <label class="ml-4 inline-flex items-center gap-1 cursor-pointer">
+    <input
+      type="checkbox"
+      id="sankey-self-refs"
+      class="rounded-sm text-primary cursor-pointer"
+    />
+    Include self-references
+  </label>
+</div>
+
+<script>
+  import * as d3 from "d3";
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+
+  const WIDTH = 720;
+  const HEIGHT = 420;
+  const MARGIN = { top: 30, right: 120, bottom: 10, left: 120 };
+  const NODE_W = 18;
+  const NODE_PAD = 12;
+
+  // Category display order (Wiki last so flows converge toward it)
+  const CATEGORY_ORDER = ["BLOG", "NEWS", "SHOP", "WIKI"] as const;
+
+  const COLORS: Record<string, string> = {
+    BLOG: "#e69f00",
+    NEWS: "#56b4e9",
+    SHOP: "#009e73",
+    WIKI: "#cc79a7",
+  };
+
+  const LABELS: Record<string, string> = {
+    BLOG: "Blog",
+    NEWS: "News",
+    SHOP: "Shop",
+    WIKI: "Wiki",
+  };
+
+  // ── DOM refs ────────────────────────────────────────────────────────────────
+
+  const plotDiv = document.querySelector<HTMLElement>("#sankey-plot");
+  const selfRefsCheckbox =
+    document.querySelector<HTMLInputElement>("#sankey-self-refs");
+
+  // ── Types ─────────────────────────────────────────────────────────────────
+
+  interface RawLink {
+    source: string;
+    target: string;
+    value: number;
+  }
+  interface LayoutNode {
+    name: string;
+    x: number;
+    y: number;
+    h: number;
+    total: number;
+  }
+  interface LayoutLink {
+    source: string;
+    target: string;
+    value: number;
+    sy: number;
+    ty: number;
+    w: number;
+  }
+
+  // ── Data ──────────────────────────────────────────────────────────────────
+
+  let allLinks: RawLink[] = [];
+
+  async function loadData() {
+    const rows = await d3.csv("/graph_data/sankey_wiki_refs.csv", d3.autoType);
+    allLinks = rows as unknown as RawLink[];
+  }
+
+  // ── Layout ────────────────────────────────────────────────────────────────
+
+  function layout(links: RawLink[]) {
+    const innerH =
+      HEIGHT -
+      MARGIN.top -
+      MARGIN.bottom -
+      NODE_PAD * (CATEGORY_ORDER.length - 1);
+
+    // Totals per side
+    const srcTotals = new Map<string, number>();
+    const dstTotals = new Map<string, number>();
+    for (const cat of CATEGORY_ORDER) {
+      srcTotals.set(
+        cat,
+        d3.sum(
+          links.filter((l) => l.source === cat),
+          (l) => l.value,
+        ),
+      );
+      dstTotals.set(
+        cat,
+        d3.sum(
+          links.filter((l) => l.target === cat),
+          (l) => l.value,
+        ),
+      );
+    }
+
+    const grandTotal = Math.max(
+      d3.sum(srcTotals.values()),
+      d3.sum(dstTotals.values()),
+    );
+    if (grandTotal === 0)
+      return { srcNodes: [], dstNodes: [], layoutLinks: [] };
+
+    // Stack nodes
+    function stackNodes(totals: Map<string, number>, x: number): LayoutNode[] {
+      const nodes: LayoutNode[] = [];
+      let y = MARGIN.top;
+      for (const name of CATEGORY_ORDER) {
+        const total = totals.get(name) ?? 0;
+        const h = (total / grandTotal) * innerH;
+        nodes.push({ name, x, y, h, total });
+        y += h + NODE_PAD;
+      }
+      return nodes;
+    }
+
+    const srcNodes = stackNodes(srcTotals, MARGIN.left);
+    const dstNodes = stackNodes(dstTotals, WIDTH - MARGIN.right - NODE_W);
+
+    // Build positioned links (sorted within each source by target order)
+    const sorted = [...links].sort(
+      (a, b) =>
+        CATEGORY_ORDER.indexOf(a.source as any) -
+          CATEGORY_ORDER.indexOf(b.source as any) ||
+        CATEGORY_ORDER.indexOf(a.target as any) -
+          CATEGORY_ORDER.indexOf(b.target as any),
+    );
+
+    const srcOffsets = new Map(srcNodes.map((n) => [n.name, n.y]));
+    const dstOffsets = new Map(dstNodes.map((n) => [n.name, n.y]));
+
+    const layoutLinks: LayoutLink[] = [];
+    for (const link of sorted) {
+      const sy = srcOffsets.get(link.source)!;
+      const ty = dstOffsets.get(link.target)!;
+      const w = (link.value / grandTotal) * innerH;
+
+      layoutLinks.push({
+        source: link.source,
+        target: link.target,
+        value: link.value,
+        sy,
+        ty,
+        w,
+      });
+
+      srcOffsets.set(link.source, sy + w);
+      dstOffsets.set(link.target, ty + w);
+    }
+
+    return { srcNodes, dstNodes, layoutLinks };
+  }
+
+  // ── Path generator ────────────────────────────────────────────────────────
+
+  function linkPath(l: LayoutLink): string {
+    const x0 = MARGIN.left + NODE_W;
+    const x1 = WIDTH - MARGIN.right - NODE_W;
+    const cx = (x0 + x1) / 2;
+
+    return [
+      `M${x0},${l.sy}`,
+      `C${cx},${l.sy} ${cx},${l.ty} ${x1},${l.ty}`,
+      `L${x1},${l.ty + l.w}`,
+      `C${cx},${l.ty + l.w} ${cx},${l.sy + l.w} ${x0},${l.sy + l.w}`,
+      "Z",
+    ].join(" ");
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  function render(includeSelf: boolean) {
+    if (!plotDiv) return;
+
+    const links = includeSelf
+      ? allLinks
+      : allLinks.filter((l) => l.source !== l.target);
+
+    const { srcNodes, dstNodes, layoutLinks } = layout(links);
+
+    plotDiv.innerHTML = "";
+    // Remove any previous tooltip from body
+    d3.select(document.body).selectAll(".sankey-tip").remove();
+
+    const svg = d3
+      .select(plotDiv)
+      .append("svg")
+      .attr("viewBox", `0 0 ${WIDTH} ${HEIGHT}`)
+      .attr("width", "100%")
+      .attr("style", `max-width:${WIDTH}px;margin:0 auto;display:block`);
+
+    // Tooltip
+    const tip = d3.select(document.body)
+      .append("div")
+      .attr("class", "sankey-tip fixed pointer-events-none bg-zinc-900 text-white text-sm rounded px-2 py-1 shadow-lg opacity-0 transition-opacity duration-150 whitespace-nowrap")
+      .style("z-index", "30");
+
+    // Compute source totals for percentages
+    const srcTotalMap = new Map<string, number>();
+    for (const n of srcNodes) srcTotalMap.set(n.name, n.total);
+
+    // Links
+    svg
+      .append("g")
+      .selectAll("path")
+      .data(layoutLinks)
+      .join("path")
+      .attr("d", (d) => linkPath(d))
+      .attr("fill", (d) => COLORS[d.source])
+      .attr("fill-opacity", 0.35)
+      .attr("stroke", (d) => COLORS[d.source])
+      .attr("stroke-opacity", 0.5)
+      .attr("stroke-width", 0.5)
+      .style("cursor", "pointer")
+      .on("mouseenter", function (_, d) {
+        d3.select(this).attr("fill-opacity", 0.65).attr("stroke-opacity", 0.8);
+        const pct = (srcTotalMap.get(d.source) ?? 0) > 0
+          ? d.value / srcTotalMap.get(d.source)!
+          : 0;
+        tip.html(`<strong>${LABELS[d.source]} → ${LABELS[d.target]}</strong><br>${d3.format(".1%")(pct)} · ${d3.format(",")(d.value)} citations`);
+        tip.style("opacity", "1");
+      })
+      .on("mousemove", (event) => {
+        tip.style("left", `${event.clientX + 12}px`).style("top", `${event.clientY - 8}px`);
+      })
+      .on("mouseleave", function () {
+        d3.select(this).attr("fill-opacity", 0.35).attr("stroke-opacity", 0.5);
+        tip.style("opacity", "0");
+      });
+
+    // Grand total for node percentages
+    const grandTotalAll = d3.sum(srcNodes, (n) => n.total);
+
+    // Source nodes
+    svg
+      .append("g")
+      .selectAll("rect")
+      .data(srcNodes.filter((n) => n.h > 0))
+      .join("rect")
+      .attr("x", (d) => d.x)
+      .attr("y", (d) => d.y)
+      .attr("width", NODE_W)
+      .attr("height", (d) => Math.max(d.h, 1))
+      .attr("fill", (d) => COLORS[d.name])
+      .style("cursor", "pointer")
+      .on("mouseenter", function (_, d) {
+        const pct = grandTotalAll > 0 ? d.total / grandTotalAll : 0;
+        tip.html(`<strong>${LABELS[d.name]} (source)</strong><br>${d3.format(".1%")(pct)} · ${d3.format(",")(d.total)} citations`);
+        tip.style("opacity", "1");
+      })
+      .on("mousemove", (event) => {
+        tip.style("left", `${event.clientX + 12}px`).style("top", `${event.clientY - 8}px`);
+      })
+      .on("mouseleave", function () {
+        tip.style("opacity", "0");
+      });
+
+    // Destination nodes
+    const dstTotalAll = d3.sum(dstNodes, (n) => n.total);
+    svg
+      .append("g")
+      .selectAll("rect")
+      .data(dstNodes.filter((n) => n.h > 0))
+      .join("rect")
+      .attr("x", (d) => d.x)
+      .attr("y", (d) => d.y)
+      .attr("width", NODE_W)
+      .attr("height", (d) => Math.max(d.h, 1))
+      .attr("fill", (d) => COLORS[d.name])
+      .style("cursor", "pointer")
+      .on("mouseenter", function (_, d) {
+        const pct = dstTotalAll > 0 ? d.total / dstTotalAll : 0;
+        tip.html(`<strong>${LABELS[d.name]} (referenced)</strong><br>${d3.format(".1%")(pct)} · ${d3.format(",")(d.total)} citations`);
+        tip.style("opacity", "1");
+      })
+      .on("mousemove", (event) => {
+        tip.style("left", `${event.clientX + 12}px`).style("top", `${event.clientY - 8}px`);
+      })
+      .on("mouseleave", function () {
+        tip.style("opacity", "0");
+      });
+
+    // Source labels
+    svg
+      .append("g")
+      .selectAll("text")
+      .data(srcNodes.filter((n) => n.h > 0))
+      .join("text")
+      .attr("x", (d) => d.x - 8)
+      .attr("y", (d) => d.y + d.h / 2)
+      .attr("dy", "0.35em")
+      .attr("text-anchor", "end")
+      .attr("font-size", 16)
+      .attr("fill", "currentColor")
+      .text((d) => LABELS[d.name]);
+
+    // Destination labels
+    svg
+      .append("g")
+      .selectAll("text")
+      .data(dstNodes.filter((n) => n.h > 0))
+      .join("text")
+      .attr("x", (d) => d.x + NODE_W + 8)
+      .attr("y", (d) => d.y + d.h / 2)
+      .attr("dy", "0.35em")
+      .attr("text-anchor", "start")
+      .attr("font-size", 16)
+      .attr("fill", "currentColor")
+      .text((d) => LABELS[d.name]);
+
+    // Column headers
+    svg
+      .append("text")
+      .attr("x", MARGIN.left + NODE_W / 2)
+      .attr("y", MARGIN.top - 10)
+      .attr("text-anchor", "middle")
+      .attr("font-size", 15)
+      .attr("font-weight", "bold")
+      .attr("fill", "currentColor")
+      .text("Source");
+
+    svg
+      .append("text")
+      .attr("x", WIDTH - MARGIN.right - NODE_W / 2)
+      .attr("y", MARGIN.top - 10)
+      .attr("text-anchor", "middle")
+      .attr("font-size", 15)
+      .attr("font-weight", "bold")
+      .attr("fill", "currentColor")
+      .text("Referenced");
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+
+  await loadData();
+  render(false);
+
+  selfRefsCheckbox?.addEventListener("change", () => {
+    render(selfRefsCheckbox.checked);
+  });
+</script>

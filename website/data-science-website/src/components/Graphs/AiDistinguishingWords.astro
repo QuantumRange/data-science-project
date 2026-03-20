@@ -1,0 +1,344 @@
+<!-- What words most strongly distinguish AI-topic pages from non-AI pages? -->
+<div id="distwords-plot"></div>
+<div id="distwords-controls">
+  <label>
+    Top
+    <select
+      id="distwords-topn"
+      class="cursor-pointer border-2 border-primary/20 ring-primary/80 rounded-lg focus:outline-none py-1"
+    >
+      <option value="10" selected>10</option>
+      <option value="20">20</option>
+    </select>
+    words per side
+  </label>
+  <input type="hidden" id="distwords-filter-symbols" value="on" />
+  <label>
+    Sort by
+    <select
+      id="distwords-sort"
+      class="cursor-pointer border-2 border-primary/20 ring-primary/80 rounded-lg focus:outline-none py-1"
+    >
+      <option value="abs_diff" selected>Difference</option>
+      <option value="ai">AI-Topic</option>
+      <option value="notAi">Non-AI-Topic</option>
+    </select>
+  </label>
+</div>
+
+<script>
+  import * as d3 from "d3";
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+
+  const WIDTH = 620;
+  const ROW_HEIGHT = 24;
+  const MARGIN = { top: 50, right: 60, bottom: 30, left: 110 };
+  const DOT_R = 5;
+
+  const AI_COLOR = "#e45756";
+  const NON_AI_COLOR = "#4c78a8";
+
+  // ── DOM refs ────────────────────────────────────────────────────────────────
+
+  const plotDiv = document.querySelector<HTMLElement>("#distwords-plot");
+  const topNSelect =
+    document.querySelector<HTMLSelectElement>("#distwords-topn");
+  const filterHidden = document.querySelector<HTMLInputElement>(
+    "#distwords-filter-symbols",
+  );
+  const sortSelect =
+    document.querySelector<HTMLSelectElement>("#distwords-sort");
+
+  // ── Types ───────────────────────────────────────────────────────────────────
+
+  interface RawRow {
+    stem: string;
+    NOT_AI: number;
+    AI: number;
+    diff: number;
+  }
+
+  interface WordDatum {
+    stem: string;
+    diff: number;
+    ai: number;
+    notAi: number;
+  }
+
+  // ── Data ────────────────────────────────────────────────────────────────────
+
+  let aiWords: WordDatum[] = [];
+  let nonAiWords: WordDatum[] = [];
+
+  const SYMBOL_RE = /^[^a-zA-Z0-9]+$/;
+
+  async function loadData() {
+    const [aiRows, nonAiRows] = await Promise.all([
+      d3.csv(
+        "/graph_data/ai_basswords/ai_topic_buzzwords.csv",
+        d3.autoType,
+      ) as Promise<RawRow[]>,
+      d3.csv(
+        "/graph_data/ai_basswords/not_ai_topic_words.csv",
+        d3.autoType,
+      ) as Promise<RawRow[]>,
+    ]);
+
+    aiWords = aiRows.map((r) => ({
+      stem: r.stem,
+      diff: r.diff,
+      ai: r.AI,
+      notAi: r.NOT_AI,
+    }));
+
+    nonAiWords = nonAiRows.map((r) => ({
+      stem: r.stem,
+      diff: r.diff,
+      ai: r.AI,
+      notAi: r.NOT_AI,
+    }));
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
+  type SortMode = "abs_diff" | "ai" | "notAi";
+
+  function render(topN: number, hideSymbols: boolean, sortBy: SortMode) {
+    if (!plotDiv) return;
+    plotDiv.innerHTML = "";
+
+    let ai = [...aiWords];
+    let nonAi = [...nonAiWords];
+
+    if (hideSymbols) {
+      ai = ai.filter((d) => !SYMBOL_RE.test(d.stem));
+      nonAi = nonAi.filter((d) => !SYMBOL_RE.test(d.stem));
+    }
+
+    // Merge both sides, dedupe by stem
+    const merged = new Map<string, WordDatum>();
+    for (const d of [...ai, ...nonAi]) {
+      if (
+        !merged.has(d.stem) ||
+        Math.abs(d.diff) > Math.abs(merged.get(d.stem)!.diff)
+      ) {
+        merged.set(d.stem, d);
+      }
+    }
+
+    let data: WordDatum[];
+    if (sortBy === "abs_diff") {
+      data = [...merged.values()]
+        .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff))
+        .slice(0, topN * 2);
+    } else if (sortBy === "ai") {
+      data = [...merged.values()]
+        .sort((a, b) => b.ai - a.ai)
+        .slice(0, topN * 2);
+    } else {
+      data = [...merged.values()]
+        .sort((a, b) => b.notAi - a.notAi)
+        .slice(0, topN * 2);
+    }
+
+    const innerW = WIDTH - MARGIN.left - MARGIN.right;
+    const innerH = data.length * ROW_HEIGHT;
+    const HEIGHT = innerH + MARGIN.top + MARGIN.bottom;
+
+    const maxFreq = d3.max(data, (d) => Math.max(d.ai, d.notAi))!;
+
+    const xScale = d3
+      .scaleLinear()
+      .domain([0, maxFreq])
+      .range([0, innerW])
+      .nice();
+
+    const yScale = d3
+      .scaleBand<number>()
+      .domain(d3.range(data.length))
+      .range([0, innerH])
+      .padding(0.15);
+
+    const svg = d3
+      .select(plotDiv)
+      .append("svg")
+      .attr("viewBox", `0 0 ${WIDTH} ${HEIGHT}`)
+      .attr("width", "100%")
+      .attr("style", `max-width:${WIDTH}px;margin:0 auto;display:block`);
+
+    const g = svg
+      .append("g")
+      .attr("transform", `translate(${MARGIN.left},${MARGIN.top})`);
+
+    // X axis at top
+    g.append("g")
+      .call(d3.axisTop(xScale).ticks(6).tickFormat(d3.format(".0%")))
+      .call((a) => a.select(".domain").attr("stroke", "currentColor"))
+      .call((a) => a.selectAll(".tick line").attr("stroke", "currentColor"))
+      .call((a) =>
+        a
+          .selectAll(".tick text")
+          .attr("fill", "currentColor")
+          .attr("font-size", 16),
+      );
+
+    // Word labels
+    const wordLabels = g
+      .append("g")
+      .selectAll("text")
+      .data(data)
+      .join("text")
+      .attr("x", -8)
+      .attr("y", (_, i) => yScale(i)! + yScale.bandwidth() / 2)
+      .attr("dy", "0.35em")
+      .attr("text-anchor", "end")
+      .attr("font-size", 16)
+      .attr("fill", "currentColor")
+      .text((d) => d.stem);
+
+    // Connecting lines (the "dumbbell bar")
+    const lines = g
+      .append("g")
+      .selectAll("line")
+      .data(data)
+      .join("line")
+      .attr("x1", (d) => xScale(Math.min(d.ai, d.notAi)))
+      .attr("x2", (d) => xScale(Math.max(d.ai, d.notAi)))
+      .attr("y1", (_, i) => yScale(i)! + yScale.bandwidth() / 2)
+      .attr("y2", (_, i) => yScale(i)! + yScale.bandwidth() / 2)
+      .attr("stroke", "currentColor")
+      .attr("stroke-opacity", 0.25)
+      .attr("stroke-width", 2);
+
+    // AI dots
+    const aiDots = g
+      .append("g")
+      .selectAll("circle")
+      .data(data)
+      .join("circle")
+      .attr("cx", (d) => xScale(d.ai))
+      .attr("cy", (_, i) => yScale(i)! + yScale.bandwidth() / 2)
+      .attr("r", DOT_R)
+      .attr("fill", AI_COLOR)
+      .attr("fill-opacity", 0.85)
+      .attr("cursor", "pointer");
+
+    // Non-AI dots
+    const nonAiDots = g
+      .append("g")
+      .selectAll("circle")
+      .data(data)
+      .join("circle")
+      .attr("cx", (d) => xScale(d.notAi))
+      .attr("cy", (_, i) => yScale(i)! + yScale.bandwidth() / 2)
+      .attr("r", DOT_R)
+      .attr("fill", NON_AI_COLOR)
+      .attr("fill-opacity", 0.85)
+      .attr("cursor", "pointer");
+
+    // Diff labels at far right
+    const diffLabels = g
+      .append("g")
+      .selectAll("text")
+      .data(data)
+      .join("text")
+      .attr("x", innerW + 4)
+      .attr("y", (_, i) => yScale(i)! + yScale.bandwidth() / 2)
+      .attr("dy", "0.35em")
+      .attr("text-anchor", "start")
+      .attr("font-size", 15)
+      .attr("fill", "currentColor")
+      .attr("fill-opacity", 0.6)
+      .text((d) => d3.format("+.2%")(d.diff));
+
+    // Hover interactions
+    function onEnter(_event: MouseEvent, d: WordDatum) {
+      const i = data.indexOf(d);
+      aiDots.attr("fill-opacity", (_, j) => (j === i ? 1 : 0.15));
+      nonAiDots.attr("fill-opacity", (_, j) => (j === i ? 1 : 0.15));
+      lines.attr("stroke-opacity", (_, j) => (j === i ? 0.5 : 0.08));
+      wordLabels.attr("fill-opacity", (_, j) => (j === i ? 1 : 0.3));
+      // Enlarge hovered dots
+      aiDots.attr("r", (_, j) => (j === i ? DOT_R + 2 : DOT_R));
+      nonAiDots.attr("r", (_, j) => (j === i ? DOT_R + 2 : DOT_R));
+      diffLabels
+        .attr("fill-opacity", (_, j) => (j === i ? 1 : 0.15))
+        .text((b, j) =>
+          j === i
+            ? `AI: ${d3.format(".2%")(b.ai)} | Non-AI: ${d3.format(".2%")(b.notAi)}`
+            : d3.format("+.2%")(b.diff),
+        );
+    }
+
+    function onLeave() {
+      aiDots.attr("fill-opacity", 0.85).attr("r", DOT_R);
+      nonAiDots.attr("fill-opacity", 0.85).attr("r", DOT_R);
+      lines.attr("stroke-opacity", 0.25);
+      wordLabels.attr("fill-opacity", 1);
+      diffLabels
+        .attr("fill-opacity", 0.6)
+        .text((d) => d3.format("+.2%")(d.diff));
+    }
+
+    aiDots.on("mouseenter", onEnter).on("mouseleave", onLeave);
+    nonAiDots.on("mouseenter", onEnter).on("mouseleave", onLeave);
+
+    // Tooltips
+    aiDots
+      .append("title")
+      .text((d) => `"${d.stem}" in AI-topic: ${d3.format(".3%")(d.ai)}`);
+    nonAiDots
+      .append("title")
+      .text((d) => `"${d.stem}" in Non-AI: ${d3.format(".3%")(d.notAi)}`);
+
+    // Legend
+    const legend = svg
+      .append("g")
+      .attr("transform", `translate(${MARGIN.left}, 12)`);
+
+    legend
+      .append("circle")
+      .attr("cx", 6)
+      .attr("cy", 6)
+      .attr("r", 5)
+      .attr("fill", AI_COLOR);
+    legend
+      .append("text")
+      .attr("x", 16)
+      .attr("y", 10)
+      .attr("font-size", 16)
+      .attr("fill", "currentColor")
+      .text("AI-topic");
+
+    legend
+      .append("circle")
+      .attr("cx", 86)
+      .attr("cy", 6)
+      .attr("r", 5)
+      .attr("fill", NON_AI_COLOR);
+    legend
+      .append("text")
+      .attr("x", 96)
+      .attr("y", 10)
+      .attr("font-size", 16)
+      .attr("fill", "currentColor")
+      .text("Non-AI-topic");
+  }
+
+  // ── Init ────────────────────────────────────────────────────────────────────
+
+  function rerender() {
+    render(
+      Number(topNSelect?.value ?? 10),
+      filterHidden?.value === "on",
+      (sortSelect?.value ?? "abs_diff") as SortMode,
+    );
+  }
+
+  await loadData();
+  rerender();
+
+  topNSelect?.addEventListener("change", rerender);
+  sortSelect?.addEventListener("change", rerender);
+</script>

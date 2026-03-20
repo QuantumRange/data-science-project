@@ -1,0 +1,21 @@
+---
+import Navbar from "@components/Navbar.astro";
+import "@styles/global.css";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="generator" content={Astro.generator} />
+    <title>The Internet Net</title>
+  </head>
+  <body class="m-0 w-full h-full bg-zinc-100">
+    <Navbar/>
+    <div class="p-4 max-w-7xl mx-auto">
+    <slot />
+    </div>
+  </body>
+</html>

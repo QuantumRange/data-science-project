@@ -1,0 +1,293 @@
+---
+export interface Props {
+  type?: "written" | "topic";
+}
+
+const { type = "written" } = Astro.props;
+
+const dataFiles: Record<string, [string, string]> = {
+  written: [
+    "/graph_data/news_site_refs/from_ai_news.csv",
+    "/graph_data/news_site_refs/from_human_news.csv",
+  ],
+  topic: [
+    "/graph_data/news_site_refs/from_ai_topic_news.csv",
+    "/graph_data/news_site_refs/from_non_ai_topic_news.csv",
+  ],
+};
+
+const sideLabels: Record<string, [string, string]> = {
+  written: ["AI", "Human"],
+  topic: ["AI Topic", "Non-AI"],
+};
+
+const [leftFile, rightFile] = dataFiles[type];
+const [leftLabel, rightLabel] = sideLabels[type];
+const uid = `newsrefs-${type}`;
+---
+
+<!-- How much do AI generated news articles refer to specific categories of domains compared to non-AI articles? -->
+<div
+  class="newsrefs-container"
+  data-uid={uid}
+  data-left-file={leftFile}
+  data-right-file={rightFile}
+  data-left-label={leftLabel}
+  data-right-label={rightLabel}
+>
+  <div id={`${uid}-plot`} class="relative flex justify-center"></div>
+</div>
+
+<script>
+  import * as d3 from "d3";
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+
+  const WIDTH = 520;
+  const HEIGHT = 520;
+  const CX = WIDTH / 2;
+  const CY = HEIGHT / 2;
+
+  const RING_GAP = 6;
+  const RING_THICKNESS = 36;
+  const OUTER_RADIUS = 230;
+
+  const RING_ORDER = ["BLOG", "NEWS", "SHOP", "WIKI"] as const;
+
+  const COLORS: Record<string, string> = {
+    BLOG: "#e69f00",
+    NEWS: "#56b4e9",
+    SHOP: "#009e73",
+    WIKI: "#cc79a7",
+  };
+
+  const LABELS: Record<string, string> = {
+    BLOG: "Blog",
+    NEWS: "News",
+    SHOP: "Shop",
+    WIKI: "Wiki",
+  };
+
+  // ── Types ───────────────────────────────────────────────────────────────────
+
+  interface RawRow {
+    topic: string;
+    outflow: number;
+  }
+
+  interface RingDatum {
+    category: string;
+    leftProportion: number;
+    rightProportion: number;
+    leftRaw: number;
+    rightRaw: number;
+    outerR: number;
+    innerR: number;
+  }
+
+  interface ArcDatum {
+    category: string;
+    side: string;
+    innerR: number;
+    outerR: number;
+    startAngle: number;
+    endAngle: number;
+    color: string;
+    opacity: number;
+    raw: number;
+    proportion: number;
+  }
+
+  // ── Init each instance ────────────────────────────────────────────────────
+
+  document.querySelectorAll<HTMLElement>(".newsrefs-container").forEach(async (container) => {
+    const uid = container.dataset.uid!;
+    const leftFile = container.dataset.leftFile!;
+    const rightFile = container.dataset.rightFile!;
+    const leftLabel = container.dataset.leftLabel!;
+    const rightLabel = container.dataset.rightLabel!;
+
+    const plotDiv = document.querySelector<HTMLElement>(`#${uid}-plot`);
+
+    // ── Data ──────────────────────────────────────────────────────────────────
+
+    const [leftRows, rightRows] = await Promise.all([
+      d3.csv(leftFile, d3.autoType) as Promise<RawRow[]>,
+      d3.csv(rightFile, d3.autoType) as Promise<RawRow[]>,
+    ]);
+
+    const leftTotal = d3.sum(leftRows, (d) => d.outflow);
+    const rightTotal = d3.sum(rightRows, (d) => d.outflow);
+
+    const leftMap = new Map(leftRows.map((r) => [r.topic, r.outflow]));
+    const rightMap = new Map(rightRows.map((r) => [r.topic, r.outflow]));
+
+    const ringData: RingDatum[] = RING_ORDER.map((cat, i) => {
+      const outerR = OUTER_RADIUS - i * (RING_THICKNESS + RING_GAP);
+      return {
+        category: cat,
+        leftProportion: (leftMap.get(cat) ?? 0) / leftTotal,
+        rightProportion: (rightMap.get(cat) ?? 0) / rightTotal,
+        leftRaw: leftMap.get(cat) ?? 0,
+        rightRaw: rightMap.get(cat) ?? 0,
+        outerR,
+        innerR: outerR - RING_THICKNESS,
+      };
+    });
+
+    // ── Render ────────────────────────────────────────────────────────────────
+
+    const arcGen = d3
+      .arc<ArcDatum>()
+      .innerRadius((d) => d.innerR)
+      .outerRadius((d) => d.outerR)
+      .startAngle((d) => d.startAngle)
+      .endAngle((d) => d.endAngle)
+      .cornerRadius(2);
+
+    function render() {
+      if (!plotDiv) return;
+      plotDiv.innerHTML = "";
+      d3.select(document.body).selectAll(`.newsrefs-tip-${uid}`).remove();
+
+      const svg = d3
+        .select(plotDiv)
+        .append("svg")
+        .attr("viewBox", `0 0 ${WIDTH} ${HEIGHT}`)
+        .attr("width", "100%")
+        .attr("style", `max-width:${WIDTH}px`);
+
+      const g = svg.append("g").attr("transform", `translate(${CX},${CY})`);
+
+      const arcData: ArcDatum[] = [];
+
+      for (const rd of ringData) {
+
+        arcData.push({
+          category: rd.category,
+          side: "left-bg",
+          innerR: rd.innerR,
+          outerR: rd.outerR,
+          startAngle: 0,
+          endAngle: Math.PI,
+          color: COLORS[rd.category],
+          opacity: 0.12,
+          raw: rd.leftRaw,
+          proportion: rd.leftProportion,
+        });
+
+        arcData.push({
+          category: rd.category,
+          side: "right-bg",
+          innerR: rd.innerR,
+          outerR: rd.outerR,
+          startAngle: Math.PI,
+          endAngle: 2 * Math.PI,
+          color: COLORS[rd.category],
+          opacity: 0.12,
+          raw: rd.rightRaw,
+          proportion: rd.rightProportion,
+        });
+
+        arcData.push({
+          category: rd.category,
+          side: "left",
+          innerR: rd.innerR,
+          outerR: rd.outerR,
+          startAngle: Math.PI * (1 - rd.leftProportion),
+          endAngle: Math.PI,
+          color: COLORS[rd.category],
+          opacity: 0.85,
+          raw: rd.leftRaw,
+          proportion: rd.leftProportion,
+        });
+
+        arcData.push({
+          category: rd.category,
+          side: "right",
+          innerR: rd.innerR,
+          outerR: rd.outerR,
+          startAngle: Math.PI,
+          endAngle: Math.PI * (1 + rd.rightProportion),
+          color: COLORS[rd.category],
+          opacity: 0.85,
+          raw: rd.rightRaw,
+          proportion: rd.rightProportion,
+        });
+      }
+
+      // Tooltip
+      const tip = d3.select(document.body)
+        .append("div")
+        .attr("class", `newsrefs-tip-${uid} fixed pointer-events-none bg-zinc-900 text-white text-sm rounded px-2 py-1 shadow-lg opacity-0 transition-opacity duration-150 whitespace-nowrap`)
+        .style("z-index", "30");
+
+      g.append("g")
+        .selectAll("path")
+        .data(arcData)
+        .join("path")
+        .attr("d", (d) => arcGen(d))
+        .attr("fill", (d) => d.color)
+        .attr("fill-opacity", (d) => d.opacity)
+        .attr("stroke", (d) => (d.side.includes("bg") ? "none" : d.color))
+        .attr("stroke-width", (d) => (d.side.includes("bg") ? 0 : 0.5))
+        .style("cursor", (d) => d.side.includes("bg") ? "default" : "pointer")
+        .on("mouseenter", function (event, d) {
+          if (d.side.includes("bg")) return;
+          d3.select(this).attr("fill-opacity", 1);
+          const sideName = d.side === "left" ? leftLabel : rightLabel;
+          tip.html(`<strong>${sideName} / ${LABELS[d.category]}</strong><br>${d3.format(".1%")(d.proportion)} · ${d3.format(",")(Math.round(d.raw))} citations`);
+          tip.style("opacity", "1");
+        })
+        .on("mousemove", (event) => {
+          tip.style("left", `${event.clientX + 12}px`).style("top", `${event.clientY - 8}px`);
+        })
+        .on("mouseleave", function (_, d) {
+          if (d.side.includes("bg")) return;
+          d3.select(this).attr("fill-opacity", d.opacity);
+          tip.style("opacity", "0");
+        });
+
+      g.append("line")
+        .attr("y1", -OUTER_RADIUS - 5)
+        .attr("y2", OUTER_RADIUS + 5)
+        .attr("stroke", "currentColor")
+        .attr("stroke-opacity", 0.2)
+        .attr("stroke-width", 1);
+
+      g.append("text")
+        .attr("x", rightLabel.length > 5 ? -40 : -32)
+        .attr("y", 5)
+        .attr("text-anchor", "middle")
+        .attr("font-size", 16)
+        .attr("font-weight", "bold")
+        .attr("fill", "currentColor")
+        .text(rightLabel);
+
+      const leftTextX = leftLabel.length > 5 ? 33 : 25;
+      g.append("text")
+        .attr("x", leftTextX)
+        .attr("y", 5)
+        .attr("text-anchor", "middle")
+        .attr("font-size", 16)
+        .attr("font-weight", "bold")
+        .attr("fill", "currentColor")
+        .text(leftLabel);
+
+      for (const rd of ringData) {
+        g.append("text")
+          .attr("x", 0)
+          .attr("y", -(rd.outerR + 4))
+          .attr("text-anchor", "middle")
+          .attr("font-size", 14)
+          .attr("fill", COLORS[rd.category])
+          .attr("font-weight", "600")
+          .text(LABELS[rd.category]);
+      }
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+
+    render();
+  });
+</script>

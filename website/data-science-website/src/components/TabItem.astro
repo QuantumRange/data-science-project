@@ -1,0 +1,33 @@
+---
+export interface Props {
+  title: string;
+  selected?: boolean;
+}
+
+const { title, selected = false } = Astro.props;
+const id = title.toLowerCase().replace(/\s+/g, "-"); // Replace all whitespace with dashes
+
+// Do NOT set selected more than once per Tabs wrapper, that is undefined behaviour
+---
+
+<button
+  id={`tab-${id}`}
+  aria-selected={selected}
+  aria-controls={`tab-panel-${id}`}
+  role="tab"
+  type="button"
+  tabindex={selected ? 0 : -1}
+  class="cursor-pointer rounded-lg p-1 px-2 font-semibold text-zinc-900 transition-all duration-200 outline-none aria-[selected=false]:hover:bg-primary/20 aria-selected:bg-primary aria-selected:text-zinc-50"
+>
+  {title}
+</button>
+<div
+  id={`tab-panel-${id}`}
+  aria-labelledby={`tab-${id}`}
+  role="tabpanel"
+  tabindex={selected ? 0 : -1}
+  hidden={!selected}
+  class="mt-2 rounded-lg"
+>
+  <slot />
+</div>

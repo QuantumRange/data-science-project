@@ -1,0 +1,207 @@
+<!-- What type of sites use the most AI buzzwords? -->
+<div id="buzzwords-plot"></div>
+<div id="buzzwords-controls">
+  <label>
+    <select
+      id="buzzwords-metric"
+      class="cursor-pointer border-2 border-primary/20 ring-primary/80 rounded-lg focus:outline-none py-1"
+    >
+      <option value="mean_buzzword">AI Buzzword Score</option>
+      <option value="mean_topic">Topic Dominance</option>
+    </select>
+  </label>
+</div>
+
+<script>
+  import * as d3 from "d3";
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+
+  const WIDTH = 520;
+  const HEIGHT = 300;
+  const MARGIN = { top: 30, right: 80, bottom: 40, left: 70 };
+
+  const CATEGORY_ORDER = ["BLOG", "NEWS", "WIKI", "SHOP"] as const;
+
+  const COLORS: Record<string, string> = {
+    BLOG: "#e69f00",
+    NEWS: "#56b4e9",
+    SHOP: "#009e73",
+    WIKI: "#cc79a7",
+  };
+
+  const LABELS: Record<string, string> = {
+    BLOG: "Blog",
+    NEWS: "News",
+    SHOP: "Shop",
+    WIKI: "Wiki",
+  };
+
+  // ── DOM refs ────────────────────────────────────────────────────────────────
+
+  const plotDiv = document.querySelector<HTMLElement>("#buzzwords-plot");
+  const metricSelect =
+    document.querySelector<HTMLSelectElement>("#buzzwords-metric");
+
+  // ── Types ───────────────────────────────────────────────────────────────────
+
+  interface RawRow {
+    topic: string;
+    mean_buzzword: number;
+    mean_topic: number;
+  }
+
+  interface BarDatum {
+    category: string;
+    mean_buzzword: number;
+    mean_topic: number;
+  }
+
+  // ── Data ────────────────────────────────────────────────────────────────────
+
+  let barData: BarDatum[] = [];
+
+  async function loadData() {
+    const rows = (await d3.csv(
+      "/graph_data/ai_basswords/data.csv",
+      d3.autoType,
+    )) as RawRow[];
+
+    const rowMap = new Map(rows.map((r) => [r.topic, r]));
+
+    barData = CATEGORY_ORDER.map((cat) => {
+      const row = rowMap.get(cat);
+      return {
+        category: cat,
+        mean_buzzword: row?.mean_buzzword ?? 0,
+        mean_topic: row?.mean_topic ?? 0,
+      };
+    });
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
+  function render(metric: "mean_buzzword" | "mean_topic") {
+    if (!plotDiv) return;
+    plotDiv.innerHTML = "";
+
+    const data = [...barData].sort((a, b) => b[metric] - a[metric]);
+
+    const innerW = WIDTH - MARGIN.left - MARGIN.right;
+    const innerH = HEIGHT - MARGIN.top - MARGIN.bottom;
+
+    const xScale = d3
+      .scaleLinear()
+      .domain([0, d3.max(data, (d) => d[metric])!])
+      .range([0, innerW])
+      .nice();
+
+    const yScale = d3
+      .scaleBand<string>()
+      .domain(data.map((d) => d.category))
+      .range([0, innerH])
+      .padding(0.35);
+
+    const svg = d3
+      .select(plotDiv)
+      .append("svg")
+      .attr("viewBox", `0 0 ${WIDTH} ${HEIGHT}`)
+      .attr("width", "100%")
+      .attr("style", `max-width:${WIDTH}px;margin:0 auto;display:block`);
+
+    const g = svg
+      .append("g")
+      .attr("transform", `translate(${MARGIN.left},${MARGIN.top})`);
+
+    // X axis
+    g.append("g")
+      .attr("transform", `translate(0,${innerH})`)
+      .call(d3.axisBottom(xScale).ticks(5).tickFormat(d3.format(".1%")))
+      .call((a) => a.select(".domain").attr("stroke", "currentColor"))
+      .call((a) => a.selectAll(".tick line").attr("stroke", "currentColor"))
+      .call((a) => a.selectAll(".tick text").attr("fill", "currentColor").attr("font-size", 15));
+
+    // Y axis labels
+    g.append("g")
+      .selectAll("text")
+      .data(data)
+      .join("text")
+      .attr("x", -10)
+      .attr("y", (d) => yScale(d.category)! + yScale.bandwidth() / 2)
+      .attr("dy", "0.35em")
+      .attr("text-anchor", "end")
+      .attr("font-size", 16)
+      .attr("font-weight", "600")
+      .attr("fill", (d) => COLORS[d.category])
+      .text((d) => LABELS[d.category]);
+
+    // Background bars (full width, faint)
+    g.append("g")
+      .selectAll("rect")
+      .data(data)
+      .join("rect")
+      .attr("x", 0)
+      .attr("y", (d) => yScale(d.category)!)
+      .attr("width", innerW)
+      .attr("height", yScale.bandwidth())
+      .attr("fill", (d) => COLORS[d.category])
+      .attr("fill-opacity", 0.08)
+      .attr("rx", 3);
+
+    // Value bars
+    const bars = g
+      .append("g")
+      .selectAll("rect")
+      .data(data)
+      .join("rect")
+      .attr("x", 0)
+      .attr("y", (d) => yScale(d.category)!)
+      .attr("width", (d) => xScale(d[metric]))
+      .attr("height", yScale.bandwidth())
+      .attr("fill", (d) => COLORS[d.category])
+      .attr("fill-opacity", 0.75)
+      .attr("rx", 3)
+      .attr("cursor", "pointer");
+
+    // Value labels at end of bars
+    const valueLabels = g
+      .append("g")
+      .selectAll("text")
+      .data(data)
+      .join("text")
+      .attr("x", (d) => xScale(d[metric]) + 6)
+      .attr("y", (d) => yScale(d.category)! + yScale.bandwidth() / 2)
+      .attr("dy", "0.35em")
+      .attr("font-size", 15)
+      .attr("fill", "currentColor")
+      .attr("fill-opacity", 0.7)
+      .text((d) => d3.format(".2%")(d[metric]));
+
+    // Hover interactions
+    bars
+      .on("mouseenter", function (_event, d) {
+        bars.attr("fill-opacity", (b) => (b === d ? 0.95 : 0.25));
+        valueLabels
+          .attr("fill-opacity", (b) => (b === d ? 1 : 0.3))
+          .attr("font-weight", (b) => (b === d ? "bold" : "normal"));
+      })
+      .on("mouseleave", function () {
+        bars.attr("fill-opacity", 0.75);
+        valueLabels.attr("fill-opacity", 0.7).attr("font-weight", "normal");
+      });
+
+    // Tooltips
+    bars
+      .append("title")
+      .text((d) => `${LABELS[d.category]}: ${d3.format(".4%")(d[metric])}`);
+  }
+
+  // ── Init ────────────────────────────────────────────────────────────────────
+
+  await loadData();
+  render("mean_buzzword");
+
+  metricSelect?.addEventListener("change", () => {
+    render(metricSelect.value as "mean_buzzword" | "mean_topic");
+  });
+</script>

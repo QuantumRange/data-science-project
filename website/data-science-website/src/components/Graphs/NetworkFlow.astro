@@ -1,0 +1,510 @@
+<!-- How much do AI domains cite other AI domains and how do non-AI domains compare? -->
+<div class="rounded-lg border border-primary/15 bg-primary/4 p-3 mb-3">
+  <div class="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-2">
+    <span class="text-base font-semibold text-zinc-600 text-right">From:</span>
+    <div class="flex items-center gap-2">
+      <div
+        id="networkflow-tabs-x"
+        class="flex w-fit gap-1 rounded-lg bg-white p-1 border border-primary/20 shadow-sm flex-wrap">
+      </div>
+      <button id="networkflow-swap" title="Swap axes" class="cursor-pointer">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          class="size-5 text-primary">
+          <path
+            fill-rule="evenodd"
+            d="M13.2 2.24a.75.75 0 0 0 .04 1.06l2.1 1.95H6.75a.75.75 0 0 0 0 1.5h8.59l-2.1 1.95a.75.75 0 1 0 1.02 1.1l3.5-3.25a.75.75 0 0 0 0-1.1l-3.5-3.25a.75.75 0 0 0-1.06.04Zm-6.4 8a.75.75 0 0 0-1.06-.04l-3.5 3.25a.75.75 0 0 0 0 1.1l3.5 3.25a.75.75 0 1 0 1.02-1.1l-2.1-1.95h8.59a.75.75 0 0 0 0-1.5H4.66l2.1-1.95a.75.75 0 0 0 .04-1.06Z"
+            clip-rule="evenodd"></path>
+        </svg>
+      </button>
+    </div>
+    <span class="text-base font-semibold text-zinc-600 text-right">To:</span>
+    <div
+      id="networkflow-tabs-y"
+      class="flex w-fit gap-1 rounded-lg bg-white p-1 border border-primary/20 shadow-sm flex-wrap">
+    </div>
+  </div>
+  <div class="flex flex-col items-center mt-3">
+    <div class="flex items-center">
+      <div
+        id="networkflow-ylabel"
+        class="text-base font-medium"
+        style="writing-mode: vertical-lr; transform: rotate(180deg); text-align: center;">
+      </div>
+      <div id="networkflow-plot"></div>
+    </div>
+    <div id="networkflow-xlabel" class="text-base font-medium text-center">
+    </div>
+  </div>
+  <div class="flex justify-center mt-2">
+    <div id="networkflow-legend"></div>
+  </div>
+</div>
+
+<script>
+  import * as Plot from "@observablehq/plot";
+  import * as d3 from "d3";
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+
+  const NBINS = 4;
+  const STEP = 1 / NBINS;
+  // Shared color scale config — referenced in both the plot and legend.
+  // Ticks are placed at powers of 10 (as fractions) so their spacing matches
+  // the symlog color distribution. tickFormat renders them as percentages.
+  const COLOR_SCALE = {
+    type: "symlog",
+    constant: 1e-4,
+    scheme: "YlGnBu",
+    ticks: [0, 0.001, 0.01, 0.1, 1],
+    tickFormat: d3.format(".1%"),
+  } as const;
+
+  // ── DOM refs ────────────────────────────────────────────────────────────────
+
+  const ALL_OPTIONS = [
+    { value: "ai", label: "AI Written" },
+    { value: "ai_topic", label: "About AI" },
+    { value: "BLOG", label: "Blog" },
+    { value: "NEWS", label: "News" },
+    { value: "WIKI", label: "Wiki" },
+    { value: "SHOP", label: "Shop" },
+  ];
+  const RESTRICTED_OPTIONS = ALL_OPTIONS.filter(
+    (o) => o.value === "ai" || o.value === "ai_topic",
+  );
+
+  const plotDiv = document.querySelector<HTMLElement>("#networkflow-plot");
+  const legendDiv = document.querySelector<HTMLElement>("#networkflow-legend");
+  const yLabelDiv = document.querySelector<HTMLElement>("#networkflow-ylabel");
+  const xLabelDiv = document.querySelector<HTMLElement>("#networkflow-xlabel");
+  const xTabsDiv = document.querySelector<HTMLElement>("#networkflow-tabs-x");
+  const yTabsDiv = document.querySelector<HTMLElement>("#networkflow-tabs-y");
+  const swapBtn =
+    document.querySelector<HTMLButtonElement>("#networkflow-swap");
+
+  const TAB_BASE =
+    "cursor-pointer rounded-lg py-1 px-2 text-base font-semibold transition-all duration-200 outline-none";
+  const TAB_ACTIVE = `${TAB_BASE} bg-primary text-white`;
+  const TAB_INACTIVE = `${TAB_BASE} text-zinc-900 hover:bg-primary/20`;
+
+  // ── Data ────────────────────────────────────────────────────────────────────
+
+  async function loadData(x: string, y: string) {
+    return d3.csv(`/graph_data/network_flow/x-${x}-y-${y}.csv`, d3.autoType);
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
+  function getLabel(value: string): string {
+    return ALL_OPTIONS.find((o) => o.value === value)?.label ?? value;
+  }
+
+  async function renderPlot(x: string, y: string) {
+    if (!plotDiv) {
+      console.error("networkflow-plot element not found");
+      return;
+    }
+
+    const rows = await loadData(x, y);
+    const xs = rows.map((d) => (d as any).x as number);
+    const ys = rows.map((d) => (d as any).y as number);
+
+    // Normalize weights to fractions of total
+    const totalWeight = d3.sum(rows, (d) => (d as any).weight as number);
+
+    // Row sums (by x) and column sums (by y) for relative scores
+    const rowSums = d3.rollup(
+      rows,
+      (v) => d3.sum(v, (d: any) => d.weight),
+      (d: any) => d.x,
+    );
+    const colSums = d3.rollup(
+      rows,
+      (v) => d3.sum(v, (d: any) => d.weight),
+      (d: any) => d.y,
+    );
+
+    const data = rows.map((d: any) => ({
+      ...d,
+      fraction: d.weight / totalWeight,
+      count: d.weight,
+      rowFrac: d.weight / (rowSums.get(d.x) || 1),
+      colFrac: d.weight / (colSums.get(d.y) || 1),
+    }));
+
+    const xLabel = getLabel(x);
+    const yLabel = getLabel(y);
+
+    // Extend tick range by two steps so the last bin edge is included
+    const xTicks = d3.range(d3.min(xs)!, d3.max(xs)! + STEP * 2, STEP);
+    const yTicks = d3.range(d3.min(ys)!, d3.max(ys)! + STEP * 2, STEP);
+
+    plotDiv.innerHTML = "";
+    const plot = Plot.plot({
+      color: COLOR_SCALE,
+      style: { fontSize: "16px" },
+      marginLeft: 55,
+      x: {
+        ticks: xTicks,
+        tickFormat: d3.format(".0%"),
+        label: null,
+      },
+      y: {
+        ticks: yTicks,
+        tickFormat: d3.format(".0%"),
+        label: null,
+      },
+      aspectRatio: 1,
+      marks: [
+        Plot.rect(data, {
+          x: "x",
+          y: "y",
+          fill: "fraction",
+          interval: STEP,
+          inset: 0,
+        }),
+      ],
+    });
+    plotDiv.append(plot);
+
+    // ── Interactive crosshair hover ───────────────────────────────────────────
+    const xSI = plot.scale("x")!;
+    const ySI = plot.scale("y")!;
+    const xS = d3
+      .scaleLinear()
+      .domain(xSI.domain as number[])
+      .range(xSI.range as number[]);
+    const yS = d3
+      .scaleLinear()
+      .domain(ySI.domain as number[])
+      .range(ySI.range as number[]);
+
+    function cellRect(d: any) {
+      const px = xS(d.x);
+      const py = yS(d.y + STEP);
+      const pw = xS(d.x + STEP) - px;
+      const ph = yS(d.y) - py;
+      return { px, py, pw, ph };
+    }
+
+    const svg = d3.select(plot);
+    const hoverG = svg.append("g").style("pointer-events", "none");
+    const interG = svg.append("g");
+
+    // Tooltip div
+    plotDiv.style.position = "relative";
+    const tip = document.createElement("div");
+    Object.assign(tip.style, {
+      display: "none",
+      position: "absolute",
+      pointerEvents: "none",
+      background: "rgba(0,0,0,.82)",
+      color: "white",
+      padding: "4px 8px",
+      borderRadius: "4px",
+      fontSize: "13px",
+      whiteSpace: "nowrap",
+      zIndex: "10",
+    });
+    plotDiv.append(tip);
+
+    const pct1 = d3.format(".1%");
+
+    function textAttrs(
+      sel: d3.Selection<SVGTextElement, unknown, null, undefined>,
+      size = 12,
+      dark = false,
+    ) {
+      const fg = dark ? "#1a1a1a" : "white";
+      const bg = dark ? "rgba(255,255,255,.6)" : "rgba(0,0,0,.6)";
+      return sel
+        .attr("text-anchor", "middle")
+        .attr("dominant-baseline", "middle")
+        .attr("font-size", `${size}px`)
+        .attr("font-weight", "bold")
+        .attr("fill", fg)
+        .attr("stroke", bg)
+        .attr("stroke-width", 3)
+        .attr("paint-order", "stroke");
+    }
+
+    function showHover(hd: any, event: MouseEvent) {
+      hoverG.selectAll("*").remove();
+
+      for (const d of data) {
+        const { px, py, pw, ph } = cellRect(d);
+        const sameRow = d.x === hd.x;
+        const sameCol = d.y === hd.y;
+
+        if (!sameRow && !sameCol) {
+          // Dim non-highlighted cells
+          hoverG
+            .append("rect")
+            .attr("x", px)
+            .attr("y", py)
+            .attr("width", pw)
+            .attr("height", ph)
+            .attr("fill", "white")
+            .attr("opacity", 0.75);
+        } else if (sameRow && sameCol) {
+          // Hovered cell
+          const ix = Math.round(d.x / STEP);
+          const iy = Math.round(d.y / STEP);
+          const onBorder =
+            ix === 0 || ix === NBINS - 1 || iy === 0 || iy === NBINS - 1;
+          const dark = d.rowFrac < 0.5 && d.colFrac < 0.5;
+          const lineStroke = dark ? "rgba(0,0,0,.5)" : "white";
+
+          const isCorner =
+            (ix === 0 || ix === NBINS - 1) && (iy === 0 || iy === NBINS - 1);
+
+          if (ix === 0 && iy === 0) {
+            hoverG
+              .append("line")
+              .attr("x1", px + pw)
+              .attr("y1", py)
+              .attr("x2", px)
+              .attr("y2", py + ph)
+              .attr("stroke", lineStroke)
+              .attr("stroke-width", 1.5)
+              .attr("opacity", 0.9);
+            textAttrs(hoverG.append("text") as any, 18, dark)
+              .attr("x", px + pw * 0.3)
+              .attr("y", py + ph * 0.38)
+              .text(pct1(d.rowFrac));
+            textAttrs(hoverG.append("text") as any, 18, dark)
+              .attr("x", px + pw * 0.7)
+              .attr("y", py + ph * 0.68)
+              .text(pct1(d.colFrac));
+          } else if (ix === NBINS - 1 && iy === 0) {
+            hoverG
+              .append("line")
+              .attr("x1", px)
+              .attr("y1", py)
+              .attr("x2", px + pw)
+              .attr("y2", py + ph)
+              .attr("stroke", lineStroke)
+              .attr("stroke-width", 1.5)
+              .attr("opacity", 0.9);
+            textAttrs(hoverG.append("text") as any, 18, dark)
+              .attr("x", px + pw * 0.7)
+              .attr("y", py + ph * 0.38)
+              .text(pct1(d.rowFrac));
+            textAttrs(hoverG.append("text") as any, 18, dark)
+              .attr("x", px + pw * 0.3)
+              .attr("y", py + ph * 0.68)
+              .text(pct1(d.colFrac));
+          } else if (ix === 0 && iy === NBINS - 1) {
+            hoverG
+              .append("line")
+              .attr("x1", px)
+              .attr("y1", py)
+              .attr("x2", px + pw)
+              .attr("y2", py + ph)
+              .attr("stroke", lineStroke)
+              .attr("stroke-width", 1.5)
+              .attr("opacity", 0.9);
+            textAttrs(hoverG.append("text") as any, 18, dark)
+              .attr("x", px + pw * 0.7)
+              .attr("y", py + ph * 0.38)
+              .text(pct1(d.colFrac));
+            textAttrs(hoverG.append("text") as any, 18, dark)
+              .attr("x", px + pw * 0.3)
+              .attr("y", py + ph * 0.68)
+              .text(pct1(d.rowFrac));
+          } else if (ix === NBINS - 1 && iy === NBINS - 1) {
+            hoverG
+              .append("line")
+              .attr("x1", px + pw)
+              .attr("y1", py)
+              .attr("x2", px)
+              .attr("y2", py + ph)
+              .attr("stroke", lineStroke)
+              .attr("stroke-width", 1.5)
+              .attr("opacity", 0.9);
+            textAttrs(hoverG.append("text") as any, 18, dark)
+              .attr("x", px + pw * 0.3)
+              .attr("y", py + ph * 0.38)
+              .text(pct1(d.colFrac));
+            textAttrs(hoverG.append("text") as any, 18, dark)
+              .attr("x", px + pw * 0.7)
+              .attr("y", py + ph * 0.68)
+              .text(pct1(d.rowFrac));
+          } else {
+            // Interior or non-corner border — cross (X)
+            hoverG
+              .append("line")
+              .attr("x1", px + pw)
+              .attr("y1", py)
+              .attr("x2", px)
+              .attr("y2", py + ph)
+              .attr("stroke", lineStroke)
+              .attr("stroke-width", 1.5)
+              .attr("opacity", 0.9);
+            hoverG
+              .append("line")
+              .attr("x1", px)
+              .attr("y1", py)
+              .attr("x2", px + pw)
+              .attr("y2", py + ph)
+              .attr("stroke", lineStroke)
+              .attr("stroke-width", 1.5)
+              .attr("opacity", 0.9);
+            // Hide the label on the border side
+            const hideTop = iy === NBINS - 1;
+            const hideBottom = iy === 0;
+            const hideLeft = ix === 0;
+            const hideRight = ix === NBINS - 1;
+            if (!hideTop)
+              textAttrs(hoverG.append("text") as any, 18, dark)
+                .attr("x", px + pw * 0.5)
+                .attr("y", py + ph * 0.2)
+                .text(pct1(d.rowFrac));
+            if (!hideBottom)
+              textAttrs(hoverG.append("text") as any, 18, dark)
+                .attr("x", px + pw * 0.5)
+                .attr("y", py + ph * 0.8)
+                .text(pct1(d.rowFrac));
+            if (!hideLeft)
+              textAttrs(hoverG.append("text") as any, 18, dark)
+                .attr("x", px + pw * 0.2)
+                .attr("y", py + ph * 0.5)
+                .text(pct1(d.colFrac));
+            if (!hideRight)
+              textAttrs(hoverG.append("text") as any, 18, dark)
+                .attr("x", px + pw * 0.8)
+                .attr("y", py + ph * 0.5)
+                .text(pct1(d.colFrac));
+          }
+        } else if (sameRow) {
+          const dark = d.rowFrac < 0.5;
+          textAttrs(hoverG.append("text") as any, 18, dark)
+            .attr("x", px + pw / 2)
+            .attr("y", py + ph / 2)
+            .text(pct1(d.rowFrac));
+        } else {
+          const dark = d.colFrac < 0.5;
+          textAttrs(hoverG.append("text") as any, 18, dark)
+            .attr("x", px + pw / 2)
+            .attr("y", py + ph / 2)
+            .text(pct1(d.colFrac));
+        }
+      }
+
+      // Tooltip with global fraction
+      const plotRect = plotDiv!.getBoundingClientRect();
+      tip.textContent = `${d3.format(".2%")(hd.fraction)} (${d3.format(",")(hd.count)} citations)`;
+      tip.style.display = "block";
+      tip.style.left = `${event.clientX - plotRect.left + 14}px`;
+      tip.style.top = `${event.clientY - plotRect.top - 32}px`;
+    }
+
+    function clearHover() {
+      hoverG.selectAll("*").remove();
+      tip.style.display = "none";
+    }
+
+    for (const d of data) {
+      const { px, py, pw, ph } = cellRect(d);
+      interG
+        .append("rect")
+        .attr("x", px)
+        .attr("y", py)
+        .attr("width", pw)
+        .attr("height", ph)
+        .attr("fill", "transparent")
+        .attr("cursor", "crosshair")
+        .on("mouseenter", (event: MouseEvent) => showHover(d, event))
+        .on("mousemove", (event: MouseEvent) => {
+          const plotRect = plotDiv!.getBoundingClientRect();
+          tip.style.left = `${event.clientX - plotRect.left + 14}px`;
+          tip.style.top = `${event.clientY - plotRect.top - 32}px`;
+        })
+        .on("mouseleave", clearHover);
+    }
+    if (xLabelDiv) {
+      xLabelDiv.textContent = `Source: ${xLabel} fraction`;
+    }
+    if (yLabelDiv) {
+      yLabelDiv.textContent = `Destination: ${yLabel} fraction`;
+    }
+    if (legendDiv) {
+      legendDiv.innerHTML = "";
+      const plotWidth = plotDiv.querySelector("svg")?.clientWidth ?? 400;
+      legendDiv.append(
+        Plot.legend({
+          color: COLOR_SCALE,
+          width: plotWidth,
+          height: 60,
+          style: { fontSize: "16px" },
+          label: `Total references: ${d3.format(",")(totalWeight)}`,
+        }),
+      );
+    }
+  }
+
+  // ── Init ────────────────────────────────────────────────────────────────────
+
+  function populateTabs(
+    container: HTMLElement,
+    options: { value: string; label: string }[],
+    selected: string,
+    onChange: (value: string) => void,
+  ) {
+    container.innerHTML = "";
+    for (const { value, label } of options) {
+      const btn = document.createElement("button");
+      btn.textContent = label;
+      btn.dataset.value = value;
+      btn.className = value === selected ? TAB_ACTIVE : TAB_INACTIVE;
+      btn.addEventListener("click", () => {
+        onChange(value);
+        container.querySelectorAll("button").forEach((b) => {
+          b.className = b.dataset.value === value ? TAB_ACTIVE : TAB_INACTIVE;
+        });
+      });
+      container.append(btn);
+    }
+  }
+
+  // Track whether axes are swapped (false = default: from=all, to=restricted)
+  let swapped = false;
+  let xVal = "ai";
+  let yVal = "ai";
+
+  function rebuildTabs() {
+    const xOpts = swapped ? RESTRICTED_OPTIONS : ALL_OPTIONS;
+    const yOpts = swapped ? ALL_OPTIONS : RESTRICTED_OPTIONS;
+    if (xTabsDiv)
+      populateTabs(xTabsDiv, xOpts, xVal, (v) => {
+        xVal = v;
+        renderPlot(xVal, yVal);
+      });
+    if (yTabsDiv)
+      populateTabs(yTabsDiv, yOpts, yVal, (v) => {
+        yVal = v;
+        renderPlot(xVal, yVal);
+      });
+  }
+
+  rebuildTabs();
+  renderPlot(xVal, yVal);
+
+  swapBtn?.addEventListener("click", () => {
+    swapped = !swapped;
+    const prevX = xVal;
+    const prevY = yVal;
+    xVal = prevY;
+    yVal = prevX;
+    // Clamp to available options after swap
+    const xOpts = swapped ? RESTRICTED_OPTIONS : ALL_OPTIONS;
+    const yOpts = swapped ? ALL_OPTIONS : RESTRICTED_OPTIONS;
+    if (!xOpts.some((o) => o.value === xVal)) xVal = xOpts[0].value;
+    if (!yOpts.some((o) => o.value === yVal)) yVal = yOpts[0].value;
+    rebuildTabs();
+    renderPlot(xVal, yVal);
+  });
+</script>

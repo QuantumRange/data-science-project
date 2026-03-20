@@ -1,0 +1,47 @@
+---
+import Popover from "./Popover.astro";
+interface NavItem {
+  label: string;
+  href: string;
+}
+const items: NavItem[] = [
+  { label: "Word Usage", href: "/#word-usage" },
+  { label: "Citation", href: "/#citation" },
+  { label: "Composition", href: "/#news-composition" },
+  { label: "Distinguishing Words", href: "/#distinguishing-words" },
+  { label: "Buzzwords", href: "/#buzzwords" },
+  { label: "Wiki Citing", href: "/#wiki-citing" },
+  { label: "Composition", href: "/#composition" },
+];
+---
+
+<nav
+  class="fixed bottom-0 w-full lg:sticky lg:top-0 z-50 bg-primary text-white shadow-lg h-10 flex justify-around lg:justify-center lg:gap-x-5 border-b border-primary/20">
+  <Popover anchor="auto" class="relative">
+    <p
+      slot="button"
+      class="font-semibold text-lg text-center my-auto h-full flex items-center hover:text-zinc-300">
+      Data
+    </p>
+    <ul
+      slot="content"
+      class="shadow-md outline-1 outline-primary/20 rounded-md py-2 px-1 flex flex-col gap-y-1 absolute bg-white w-fit z-9999">
+      {
+        items.map((item) => (
+          <li>
+            <a
+              class="px-2 py-1.5 hover:bg-zinc-600/10 rounded-md hover:cursor-pointer w-full block text-zinc-900 text-center"
+              href={item.href}>
+              {item.label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </Popover>
+  <a
+    class="font-semibold text-lg text-center my-auto h-full flex items-center cursor-pointer hover:text-zinc-300" href="/data" 
+    >Process</a
+  >
+    <a class="font-semibold text-lg text-center my-auto h-full flex items-center cursor-pointer hover:text-zinc-300" href="/imprint">Imprint</a>
+</nav>

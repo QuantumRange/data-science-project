@@ -1,0 +1,73 @@
+---
+import Tabs from "@components/Tabs.astro";
+import Layout from "../layouts/Layout.astro";
+import Popover from "@components/Popover.astro";
+import TabItem from "@components/TabItem.astro";
+import TitleBar from "@components/TitleBar.astro";
+import ContentBox from "@components/ContentBox.astro";
+import SampleGraph from "@components/Graphs/SampleGraph.astro";
+import AiScoreGraph from "@components/Graphs/AiScoreGraph.astro";
+import NetworkFlow from "@components/Graphs/NetworkFlow.astro";
+import WikiReferences from "@components/Graphs/WikiReferences.astro";
+import NewsRefs from "@components/Graphs/NewsRefs.astro";
+
+import WordCloud from "@components/Graphs/WordCloud.astro";
+import AiBuzzwords from "@components/Graphs/AiBuzzwords.astro";
+import AiDistinguishingWords from "@components/Graphs/AiDistinguishingWords.astro";
+import AiTreemap from "@components/Graphs/AiTreemap.astro";
+// TODO: https://d3-graph-gallery.com/index.html
+---
+
+<Layout>
+  <TitleBar title="AI Influence" />
+  <ContentBox title="Apple Stocks">
+    <Tabs>
+      <TabItem title="WikiReferences">
+        <p>
+          How much do wikis get referenced over other "news"/"information"
+          sources?
+        </p>
+        <WikiReferences />
+      </TabItem>
+      <TabItem title="NetworkFlow">
+        <p>
+          How much do AI domains cite other AI domains and how do non-AI domains
+          compare?
+        </p>
+        <NetworkFlow />
+      </TabItem>
+      <TabItem title="NewsRefs">
+        <p>
+          How much do AI generated news articles refer to specific categories of
+          domains compared to non-AI articles?
+        </p>
+        <NewsRefs />
+      </TabItem>
+      <TabItem title="WordCloud">
+        <p>
+          What words appear most frequently in AI-generated vs human-written
+          articles?
+        </p>
+        <WordCloud />
+      </TabItem>
+      <TabItem title="AiBuzzwords">
+        <p>Which site categories talk the most about AI topics?</p>
+        <AiBuzzwords />
+      </TabItem>
+      <TabItem title="DistinguishingWords">
+        <p>
+          What stems/words most strongly distinguish AI-topic pages from
+          non-AI-topic pages?
+        </p>
+        <AiDistinguishingWords />
+      </TabItem>
+      <TabItem title="Composition" selected>
+        <p>
+          How is the dataset composed in terms of AI generation, AI topic, and
+          site type?
+        </p>
+        <AiTreemap />
+      </TabItem>
+    </Tabs>
+  </ContentBox>
+</Layout>
